@@ -3,6 +3,7 @@ import random
 import string
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.exc import DatabaseError, IntegrityError
@@ -38,6 +39,19 @@ from .security import create_access_token, get_password_hash, verify_password
 
 app = FastAPI(title='Airline Reservation API', version='0.1.0')
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auth/login')
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+    ],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 
 @app.get('/')

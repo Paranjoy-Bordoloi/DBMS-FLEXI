@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+
+:root {
+  --ink: #15233d;
+  --muted: #4b5a72;
+  --panel-border: #c8d9e8;
+  --bg-a: #f2fff8;
+  --bg-b: #edf3ff;
+  --bg-c: #fff5ed;
+  --font-body: 'Barlow', 'Segoe UI', sans-serif;
+  --font-head: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(circle at 15% 10%, var(--bg-a), transparent 40%),
+    radial-gradient(circle at 90% 20%, var(--bg-c), transparent 35%),
+    linear-gradient(150deg, var(--bg-b), #fff);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-head);
+}
+
+p {
+  margin: 0;
+}
