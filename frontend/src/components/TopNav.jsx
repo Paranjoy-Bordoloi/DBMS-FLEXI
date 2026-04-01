@@ -5,6 +5,7 @@ const links = [
   { to: '/search', label: 'Search Flights' },
   { to: '/book', label: 'Book Ticket' },
   { to: '/manage', label: 'Manage Booking' },
+  { to: '/admin', label: 'Admin Dashboard' },
 ]
 
 export default function TopNav({ me }) {

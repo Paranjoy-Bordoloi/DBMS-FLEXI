@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import TopNav from './components/TopNav'
 import { clearToken, fetchMe, getSavedUser, saveUser } from './lib/api'
 import BookingPage from './pages/BookingPage'
+import AdminDashboardPage from './pages/AdminDashboardPage'
 import LoginPage from './pages/LoginPage'
 import ManageBookingPage from './pages/ManageBookingPage'
 import SearchPage from './pages/SearchPage'
@@ -78,6 +79,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ManageBookingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboardPage />
             </ProtectedRoute>
           }
         />

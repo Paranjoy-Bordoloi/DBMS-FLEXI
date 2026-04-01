@@ -1,14 +1,32 @@
 import axios from 'axios'
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+const PASSENGER_API_BASE_URL =
+  import.meta.env.VITE_PASSENGER_API_BASE_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://127.0.0.1:8000'
+
+const ADMIN_API_BASE_URL =
+  import.meta.env.VITE_ADMIN_API_BASE_URL || 'http://127.0.0.1:8080/admin'
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: PASSENGER_API_BASE_URL,
+  timeout: 15000,
+})
+
+export const adminApi = axios.create({
+  baseURL: ADMIN_API_BASE_URL,
   timeout: 15000,
 })
 
 api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ars_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+adminApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('ars_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -75,5 +93,10 @@ export async function retrieveBooking(pnr, lastName) {
 
 export async function cancelBooking(pnr, reason) {
   const response = await api.post(`/bookings/${pnr}/cancel`, { reason })
+  return response.data
+}
+
+export async function fetchAdminDashboardSummary() {
+  const response = await adminApi.get('/dashboard/summary')
   return response.data
 }
