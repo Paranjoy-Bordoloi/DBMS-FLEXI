@@ -5,7 +5,6 @@ const links = [
   { to: '/search', label: 'Search Flights' },
   { to: '/book', label: 'Book Ticket' },
   { to: '/manage', label: 'Manage Booking' },
-  { to: '/admin', label: 'Admin Dashboard' },
 ]
 
 export default function TopNav({ me }) {
@@ -33,6 +32,14 @@ export default function TopNav({ me }) {
             {item.label}
           </Link>
         ))}
+        {me?.role === 'Admin' ? (
+          <Link
+            to="/admin"
+            className={location.pathname === '/admin' ? 'nav-link active' : 'nav-link'}
+          >
+            Admin Dashboard
+          </Link>
+        ) : null}
       </nav>
       <div className="user-chip">
         <span>{me?.email || 'Not signed in'}</span>

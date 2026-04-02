@@ -19,6 +19,7 @@ from .schemas import (
     AdminCreateRouteRequest,
     AdminMessageResponse,
     AdminUpdateFlightRequest,
+    AirportOptionResponse,
     BookingDetailResponse,
     CancelBookingRequest,
     CancelBookingResponse,
@@ -91,6 +92,18 @@ def _calculate_refund_ratio(hours_before_departure: float) -> float:
     if hours_before_departure >= 24:
         return 0.70
     return 0.40
+
+
+def _seat_candidates(capacity: int) -> list[str]:
+    letters = ['A', 'B', 'C', 'D', 'E', 'F']
+    candidates = []
+    rows = (capacity + len(letters) - 1) // len(letters)
+    for row in range(1, rows + 1):
+        for letter in letters:
+            candidates.append(f'{row}{letter}')
+            if len(candidates) >= capacity:
+                return candidates
+    return candidates
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> AppUser:
@@ -248,6 +261,20 @@ def search_flights(
     ]
 
 
+@app.get('/airports', response_model=list[AirportOptionResponse])
+def list_airports(db: Session = Depends(get_db)) -> list[AirportOptionResponse]:
+    records = db.query(Airport).order_by(Airport.airport_code.asc()).all()
+    return [
+        AirportOptionResponse(
+            airport_code=row.airport_code,
+            city=row.city,
+            name=row.name,
+            country=row.country,
+        )
+        for row in records
+    ]
+
+
 @app.post('/bookings/seat-lock', response_model=SeatLockResponse, status_code=status.HTTP_201_CREATED)
 def lock_seat(
     payload: SeatLockRequest,
@@ -327,6 +354,7 @@ def create_booking(
     current_user: AppUser = Depends(require_roles('Passenger', 'Admin')),
 ) -> CreateBookingResponse:
     now = datetime.now()
+    lock_surcharge = 200.0
 
     if current_user.role != 'Admin' and current_user.user_id != payload.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='You can only create bookings for your own user account.')
@@ -342,18 +370,57 @@ def create_booking(
     if flight.departure_time <= now:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot book a departed flight.')
 
+    seat_number = payload.seat_number.strip().upper() if payload.seat_number else None
+
+    if payload.random_allotment:
+        capacity = db.query(Aircraft.total_capacity).filter(Aircraft.aircraft_id == flight.aircraft_id).scalar() or 0
+        booked_or_locked = {
+            seat
+            for (seat,) in db.query(Booking.seat_number)
+            .filter(Booking.flight_id == payload.flight_id)
+            .filter(Booking.status.in_(['Pending', 'Confirmed']))
+            .all()
+        }
+        locked_seats = {
+            seat
+            for (seat,) in db.query(SeatLock.seat_number)
+            .filter(SeatLock.flight_id == payload.flight_id)
+            .filter(SeatLock.expires_at > now)
+            .all()
+        }
+        unavailable = booked_or_locked.union(locked_seats)
+        options = [seat for seat in _seat_candidates(capacity) if seat not in unavailable]
+        if not options:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='No seats available for random allotment.')
+        seat_number = random.choice(options)
+    elif not seat_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat number is required when random allotment is disabled.')
+
+    foreign_lock = (
+        db.query(SeatLock)
+        .filter(SeatLock.flight_id == payload.flight_id)
+        .filter(SeatLock.seat_number == seat_number)
+        .filter(SeatLock.locked_by_user_id != payload.user_id)
+        .filter(SeatLock.expires_at > now)
+        .first()
+    )
+    if foreign_lock:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Selected seat is temporarily locked by another user.')
+
     active_lock = (
         db.query(SeatLock)
         .filter(SeatLock.flight_id == payload.flight_id)
-        .filter(SeatLock.seat_number == payload.seat_number)
+        .filter(SeatLock.seat_number == seat_number)
         .filter(SeatLock.locked_by_user_id == payload.user_id)
         .filter(SeatLock.expires_at > now)
         .first()
     )
-    if not active_lock:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Active seat lock required before booking.')
 
-    total_amount = float(flight.base_price) + payload.tax_amount + payload.service_charge
+    if payload.use_seat_lock and not active_lock:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Seat lock option selected, but active lock not found for this seat.')
+
+    surcharge = lock_surcharge if payload.use_seat_lock and active_lock else 0.0
+    total_amount = float(flight.base_price) + payload.tax_amount + payload.service_charge + surcharge
     booking_reference = _generate_booking_reference(db)
 
     booking = Booking(
@@ -361,7 +428,7 @@ def create_booking(
         passenger_id=payload.passenger_id,
         flight_id=payload.flight_id,
         booking_date=now,
-        seat_number=payload.seat_number,
+        seat_number=seat_number,
         class_type=payload.class_type,
         status='Confirmed',
         total_amount=total_amount,
@@ -382,7 +449,8 @@ def create_booking(
         db.flush()
         payment.booking_id = booking.booking_id
         db.add(payment)
-        db.query(SeatLock).filter(SeatLock.lock_id == active_lock.lock_id).delete(synchronize_session=False)
+        if active_lock:
+            db.query(SeatLock).filter(SeatLock.lock_id == active_lock.lock_id).delete(synchronize_session=False)
         db.commit()
         db.refresh(booking)
     except IntegrityError as error:

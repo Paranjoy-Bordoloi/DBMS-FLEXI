@@ -74,6 +74,11 @@ export async function searchFlights(params) {
   return response.data
 }
 
+export async function fetchAirports() {
+  const response = await api.get('/airports')
+  return response.data
+}
+
 export async function lockSeat(payload) {
   const response = await api.post('/bookings/seat-lock', payload)
   return response.data

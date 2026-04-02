@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchFlights } from '../lib/api'
+import { fetchAirports, searchFlights } from '../lib/api'
 
 export default function SearchPage() {
   const navigate = useNavigate()
@@ -10,8 +10,38 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState('price')
   const [sortOrder, setSortOrder] = useState('asc')
   const [flights, setFlights] = useState([])
+  const [airports, setAirports] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    fetchAirports()
+      .then((data) => {
+        if (active) {
+          setAirports(data)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAirports([])
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const airportOptions = useMemo(
+    () => airports.map((airport) => `${airport.airport_code} - ${airport.city}`),
+    [airports],
+  )
+
+  function normalizeAirportInput(value) {
+    const code = value.split('-')[0].trim().toUpperCase()
+    return code.slice(0, 3)
+  }
 
   async function handleSearch(event) {
     event.preventDefault()
@@ -20,8 +50,8 @@ export default function SearchPage() {
 
     try {
       const data = await searchFlights({
-        origin_code: originCode,
-        destination_code: destinationCode,
+        origin_code: normalizeAirportInput(originCode),
+        destination_code: normalizeAirportInput(destinationCode),
         travel_date: travelDate,
         sort_by: sortBy,
         sort_order: sortOrder,
@@ -44,13 +74,14 @@ export default function SearchPage() {
     <main className="page">
       <section className="panel">
         <h2>Flight Search</h2>
+        <p className="subtle">Type airport code or choose suggestion (e.g., PNQ - Pune).</p>
         <form className="grid-form" onSubmit={handleSearch}>
           <label>
             Origin
             <input
               value={originCode}
               onChange={(e) => setOriginCode(e.target.value.toUpperCase())}
-              maxLength={3}
+              list="airport-options"
               required
             />
           </label>
@@ -60,10 +91,16 @@ export default function SearchPage() {
             <input
               value={destinationCode}
               onChange={(e) => setDestinationCode(e.target.value.toUpperCase())}
-              maxLength={3}
+              list="airport-options"
               required
             />
           </label>
+
+          <datalist id="airport-options">
+            {airportOptions.map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
 
           <label>
             Travel Date

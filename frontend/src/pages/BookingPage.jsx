@@ -5,6 +5,8 @@ export default function BookingPage() {
   const [me, setMe] = useState(null)
   const [flightId, setFlightId] = useState(localStorage.getItem('ars_selected_flight_id') || '1')
   const [seatNumber, setSeatNumber] = useState('15A')
+  const [randomAllotment, setRandomAllotment] = useState(false)
+  const [useSeatLock, setUseSeatLock] = useState(false)
   const [classType, setClassType] = useState('Economy')
   const [paymentMethod, setPaymentMethod] = useState('UPI')
   const [transactionReference, setTransactionReference] = useState(`TXN-${Date.now()}`)
@@ -44,6 +46,11 @@ export default function BookingPage() {
       return
     }
 
+    if (randomAllotment) {
+      setError('Seat lock is not available when random allotment is enabled.')
+      return
+    }
+
     setError('')
     setLoadingLock(true)
     setLockResult(null)
@@ -70,6 +77,11 @@ export default function BookingPage() {
       return
     }
 
+    if (!randomAllotment && !seatNumber.trim()) {
+      setError('Seat number is required when random allotment is disabled.')
+      return
+    }
+
     setError('')
     setLoadingBooking(true)
     setBookingResult(null)
@@ -79,12 +91,14 @@ export default function BookingPage() {
         passenger_id: Number(passengerId),
         user_id: Number(userId),
         flight_id: Number(flightId),
-        seat_number: seatNumber,
+        seat_number: randomAllotment ? null : seatNumber,
         class_type: classType,
         payment_method: paymentMethod,
         transaction_reference: transactionReference,
         tax_amount: Number(taxAmount),
         service_charge: Number(serviceCharge),
+        random_allotment: randomAllotment,
+        use_seat_lock: useSeatLock,
       })
       setBookingResult(result)
       localStorage.setItem('ars_last_pnr', result.booking_reference)
@@ -97,12 +111,46 @@ export default function BookingPage() {
 
   return (
     <main className="page">
-      <section className="panel">
-        <h2>Create Booking</h2>
+      <section className="panel booking-hero">
+        <h2>Book Ticket</h2>
         <p className="subtle">
           Signed in as {me?.email || 'loading...'} | User ID: {userId || '-'} | Passenger ID: {passengerId || '-'}
         </p>
+        <p className="subtle">Seat lock is optional and adds INR 200 convenience charge.</p>
+      </section>
 
+      <section className="panel">
+        <h3>Seat Selection Mode</h3>
+        <div className="toggle-row">
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={randomAllotment}
+              onChange={(e) => {
+                setRandomAllotment(e.target.checked)
+                if (e.target.checked) {
+                  setUseSeatLock(false)
+                  setLockResult(null)
+                }
+              }}
+            />
+            Random seat allotment from available seats
+          </label>
+
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={useSeatLock}
+              onChange={(e) => setUseSeatLock(e.target.checked)}
+              disabled={randomAllotment}
+            />
+            Use seat locking (+ INR 200)
+          </label>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3>Optional Lock Step</h3>
         <form className="grid-form" onSubmit={handleSeatLock}>
           <label>
             Flight ID
@@ -111,10 +159,15 @@ export default function BookingPage() {
 
           <label>
             Seat Number
-            <input value={seatNumber} onChange={(e) => setSeatNumber(e.target.value.toUpperCase())} required />
+            <input
+              value={seatNumber}
+              onChange={(e) => setSeatNumber(e.target.value.toUpperCase())}
+              disabled={randomAllotment}
+              required={!randomAllotment}
+            />
           </label>
 
-          <button type="submit" disabled={loadingLock}>
+          <button type="submit" disabled={loadingLock || !useSeatLock || randomAllotment}>
             {loadingLock ? 'Locking...' : '1. Lock Seat'}
           </button>
         </form>
@@ -124,8 +177,26 @@ export default function BookingPage() {
             Seat locked until {new Date(lockResult.expires_at).toLocaleTimeString()}
           </p>
         ) : null}
+      </section>
 
+      <section className="panel">
+        <h3>Payment & Confirmation</h3>
         <form className="grid-form" onSubmit={handleCreateBooking}>
+          <label>
+            Flight ID
+            <input value={flightId} onChange={(e) => setFlightId(e.target.value)} required />
+          </label>
+
+          <label>
+            Seat Number
+            <input
+              value={randomAllotment ? 'AUTO-ASSIGNED' : seatNumber}
+              onChange={(e) => setSeatNumber(e.target.value.toUpperCase())}
+              disabled={randomAllotment}
+              required={!randomAllotment}
+            />
+          </label>
+
           <label>
             Class Type
             <select value={classType} onChange={(e) => setClassType(e.target.value)}>
@@ -169,6 +240,8 @@ export default function BookingPage() {
             {loadingBooking ? 'Booking...' : '2. Confirm Booking'}
           </button>
         </form>
+
+        {useSeatLock ? <p className="subtle">Lock surcharge will be included in total fare.</p> : null}
 
         {error ? <p className="error-msg">{error}</p> : null}
         {bookingResult ? (

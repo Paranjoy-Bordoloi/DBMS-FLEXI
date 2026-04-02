@@ -44,6 +44,13 @@ class FlightSearchResponse(BaseModel):
     status: str
 
 
+class AirportOptionResponse(BaseModel):
+    airport_code: str
+    city: str
+    name: str
+    country: str
+
+
 class SeatLockRequest(BaseModel):
     user_id: int
     flight_id: int
@@ -62,12 +69,14 @@ class CreateBookingRequest(BaseModel):
     passenger_id: int
     user_id: int
     flight_id: int
-    seat_number: str = Field(min_length=1, max_length=5)
+    seat_number: str | None = Field(default=None, min_length=1, max_length=5)
     class_type: str = Field(pattern='^(Economy|Business|First)$')
     payment_method: str = Field(pattern='^(CreditCard|DebitCard|UPI|NetBanking|Wallet)$')
     transaction_reference: str = Field(min_length=5, max_length=50)
     tax_amount: float = Field(default=0, ge=0)
     service_charge: float = Field(default=0, ge=0)
+    random_allotment: bool = False
+    use_seat_lock: bool = False
 
 
 class CreateBookingResponse(BaseModel):

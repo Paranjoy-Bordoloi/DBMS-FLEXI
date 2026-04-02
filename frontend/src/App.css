@@ -94,6 +94,10 @@
   backdrop-filter: blur(4px);
 }
 
+.booking-hero {
+  background: linear-gradient(135deg, #ecfff6, #f5f9ff 60%, #fff6ef);
+}
+
 .auth-card {
   width: min(540px, 92%);
 }
@@ -107,6 +111,25 @@
 
 .grid-form {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.toggle-row {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.checkbox-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
 }
 
 label {
