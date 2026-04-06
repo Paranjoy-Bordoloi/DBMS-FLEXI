@@ -6,7 +6,7 @@ const PASSENGER_API_BASE_URL =
   'http://127.0.0.1:8000'
 
 const ADMIN_API_BASE_URL =
-  import.meta.env.VITE_ADMIN_API_BASE_URL || 'http://127.0.0.1:8080/admin'
+  import.meta.env.VITE_ADMIN_API_BASE_URL || 'http://localhost:8080/admin'
 
 export const api = axios.create({
   baseURL: PASSENGER_API_BASE_URL,
@@ -19,14 +19,6 @@ export const adminApi = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('ars_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
-adminApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('ars_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -64,6 +56,11 @@ export async function login(payload) {
   return response.data
 }
 
+export async function register(payload) {
+  const response = await api.post('/auth/register', payload)
+  return response.data
+}
+
 export async function fetchMe() {
   const response = await api.get('/auth/me')
   return response.data
@@ -93,6 +90,11 @@ export async function retrieveBooking(pnr, lastName) {
   const response = await api.get('/bookings/retrieve', {
     params: { pnr, last_name: lastName },
   })
+  return response.data
+}
+
+export async function fetchCurrentBookings() {
+  const response = await api.get('/bookings/current')
   return response.data
 }
 

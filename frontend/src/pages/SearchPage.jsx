@@ -2,11 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchAirports, searchFlights } from '../lib/api'
 
+function getTodayLocalDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function SearchPage() {
   const navigate = useNavigate()
-  const [originCode, setOriginCode] = useState('PNQ')
-  const [destinationCode, setDestinationCode] = useState('DEL')
-  const [travelDate, setTravelDate] = useState('2026-03-15')
+  const [originCode, setOriginCode] = useState('')
+  const [destinationCode, setDestinationCode] = useState('')
+  const [travelDate, setTravelDate] = useState(getTodayLocalDate())
   const [sortBy, setSortBy] = useState('price')
   const [sortOrder, setSortOrder] = useState('asc')
   const [flights, setFlights] = useState([])
@@ -72,7 +80,8 @@ export default function SearchPage() {
 
   return (
     <main className="page">
-      <section className="panel">
+      <section className="panel panel-hero">
+        <p className="page-kicker">Journey Planner</p>
         <h2>Flight Search</h2>
         <p className="subtle">Type airport code or choose suggestion (e.g., PNQ - Pune).</p>
         <form className="grid-form" onSubmit={handleSearch}>
@@ -144,7 +153,7 @@ export default function SearchPage() {
           <div className="result-list">
             {flights.map((flight) => (
               <article className="flight-card" key={flight.flight_id}>
-                <div>
+                <div className="flight-meta">
                   <p className="flight-number">{flight.flight_number}</p>
                   <p>
                     {flight.origin_code} to {flight.destination_code}

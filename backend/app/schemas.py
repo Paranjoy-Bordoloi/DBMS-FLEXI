@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -9,8 +9,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     phone: str = Field(min_length=7, max_length=20)
     passport_number: str = Field(min_length=5, max_length=20)
+    date_of_birth: date
     password: str = Field(min_length=8, max_length=128)
-    age: int | None = Field(default=None, ge=0)
     address: str | None = Field(default=None, max_length=255)
 
 
@@ -87,6 +87,18 @@ class CreateBookingResponse(BaseModel):
 
 
 class BookingDetailResponse(BaseModel):
+    booking_reference: str
+    passenger_name: str
+    flight_number: str
+    departure_time: datetime
+    arrival_time: datetime
+    seat_number: str
+    class_type: str
+    booking_status: str
+    total_amount: float
+
+
+class CurrentBookingResponse(BaseModel):
     booking_reference: str
     passenger_name: str
     flight_number: str

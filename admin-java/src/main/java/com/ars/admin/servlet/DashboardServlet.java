@@ -16,6 +16,9 @@ import jakarta.servlet.http.HttpServletResponse;
 
 @WebServlet(name = "DashboardServlet", urlPatterns = "/dashboard/summary")
 public class DashboardServlet extends HttpServlet {
+    private static final String FRONTEND_ORIGIN_LOCALHOST = "http://localhost:5173";
+    private static final String FRONTEND_ORIGIN_LOOPBACK = "http://127.0.0.1:5173";
+
     private static final String TOTAL_BOOKINGS_SQL = "SELECT COUNT(*) FROM booking";
     private static final String CONFIRMED_BOOKINGS_SQL = "SELECT COUNT(*) FROM booking WHERE status='Confirmed'";
     private static final String TOTAL_REVENUE_SQL = "SELECT COALESCE(SUM(amount), 0) FROM payment WHERE payment_status='Success'";
@@ -32,9 +35,7 @@ public class DashboardServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        // Basic CORS for local frontend during development.
-        resp.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
-        resp.setHeader("Access-Control-Allow-Credentials", "true");
+        applyCorsHeaders(req, resp);
 
         resp.setContentType("application/json");
         resp.setCharacterEncoding("UTF-8");
@@ -55,6 +56,25 @@ public class DashboardServlet extends HttpServlet {
             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             resp.getWriter().write(body.toString());
         }
+    }
+
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) {
+        applyCorsHeaders(req, resp);
+        resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
+    }
+
+    private void applyCorsHeaders(HttpServletRequest req, HttpServletResponse resp) {
+        String origin = req.getHeader("Origin");
+        if (FRONTEND_ORIGIN_LOCALHOST.equals(origin) || FRONTEND_ORIGIN_LOOPBACK.equals(origin)) {
+            resp.setHeader("Access-Control-Allow-Origin", origin);
+            resp.setHeader("Vary", "Origin");
+        }
+
+        resp.setHeader("Access-Control-Allow-Credentials", "true");
+        resp.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+        resp.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        resp.setHeader("Access-Control-Max-Age", "3600");
     }
 
     private long countValue(Connection conn, String sql) throws SQLException {

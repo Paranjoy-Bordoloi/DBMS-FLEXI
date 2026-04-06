@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 import random
 import string
 
@@ -25,6 +25,7 @@ from .schemas import (
     CancelBookingResponse,
     CreateBookingRequest,
     CreateBookingResponse,
+    CurrentBookingResponse,
     CurrentUserResponse,
     DashboardSummaryResponse,
     FlightSearchResponse,
@@ -41,11 +42,19 @@ from .security import create_access_token, get_password_hash, verify_password
 app = FastAPI(title='Airline Reservation API', version='0.1.0')
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auth/login')
 
+CLASS_FARE_MULTIPLIERS: dict[str, float] = {
+    'Economy': 1.00,
+    'Business': 1.70,
+    'First': 2.35,
+}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         'http://localhost:5173',
+        'http://localhost:5174',
         'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
     ],
@@ -77,6 +86,14 @@ def _validate_password_complexity(password: str) -> None:
         )
 
 
+def _validate_date_of_birth(date_of_birth: date) -> None:
+    if date_of_birth >= date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Date of birth must be a past date.',
+        )
+
+
 def _generate_booking_reference(db: Session) -> str:
     while True:
         suffix = ''.join(random.choices(string.digits, k=10))
@@ -94,6 +111,10 @@ def _calculate_refund_ratio(hours_before_departure: float) -> float:
     return 0.40
 
 
+def _class_fare_multiplier(class_type: str) -> float:
+    return CLASS_FARE_MULTIPLIERS.get(class_type, 1.0)
+
+
 def _seat_candidates(capacity: int) -> list[str]:
     letters = ['A', 'B', 'C', 'D', 'E', 'F']
     candidates = []
@@ -104,6 +125,56 @@ def _seat_candidates(capacity: int) -> list[str]:
             if len(candidates) >= capacity:
                 return candidates
     return candidates
+
+
+def _seat_index(seat_number: str) -> int:
+    seat = (seat_number or '').strip().upper()
+    if len(seat) < 2:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat number format is invalid.')
+
+    row_part = ''.join(ch for ch in seat if ch.isdigit())
+    letter_part = ''.join(ch for ch in seat if ch.isalpha())
+    if not row_part or not letter_part:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat number format is invalid.')
+
+    try:
+        row = int(row_part)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat number format is invalid.') from error
+
+    letter = letter_part[0]
+    seat_letters = ['A', 'B', 'C', 'D', 'E', 'F']
+    if row < 1 or letter not in seat_letters:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat number format is invalid.')
+
+    return (row - 1) * len(seat_letters) + seat_letters.index(letter) + 1
+
+
+def _first_class_seat_count(business_seats: int) -> int:
+    if business_seats <= 0:
+        return 0
+    if business_seats < 8:
+        return 0
+    return min(max(round(business_seats * 0.35), 4), business_seats)
+
+
+def _class_seat_numbers(capacity: int, business_seats: int, class_type: str) -> set[str]:
+    seat_map = _seat_candidates(capacity)
+    business_cap = max(min(business_seats, capacity), 0)
+    first_cap = _first_class_seat_count(business_cap)
+
+    if class_type == 'First':
+        if first_cap == 0:
+            return set()
+        return set(seat_map[:first_cap])
+
+    if class_type == 'Business':
+        business_start = first_cap
+        if business_cap <= business_start:
+            return set()
+        return set(seat_map[business_start:business_cap])
+
+    return set(seat_map[business_cap:])
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> AppUser:
@@ -145,6 +216,7 @@ def health_check() -> dict[str, str]:
 @app.post('/auth/register', status_code=status.HTTP_201_CREATED)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, str]:
     _validate_password_complexity(payload.password)
+    _validate_date_of_birth(payload.date_of_birth)
 
     existing_user = db.query(AppUser).filter(AppUser.email == payload.email).first()
     if existing_user:
@@ -160,7 +232,7 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)) -> di
         email=payload.email,
         phone=payload.phone,
         passport_number=payload.passport_number,
-        age=payload.age,
+        date_of_birth=payload.date_of_birth,
         address=payload.address,
     )
     db.add(passenger)
@@ -301,6 +373,10 @@ def lock_seat(
     if not flight:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Flight not found.')
 
+    aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == flight.aircraft_id).first()
+    if not aircraft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Aircraft not found for selected flight.')
+
     existing_booking = (
         db.query(Booking)
         .filter(Booking.flight_id == payload.flight_id)
@@ -371,9 +447,15 @@ def create_booking(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot book a departed flight.')
 
     seat_number = payload.seat_number.strip().upper() if payload.seat_number else None
+    allowed_seats = _class_seat_numbers(aircraft.total_capacity, aircraft.business_seats, payload.class_type)
+
+    if payload.class_type in {'Business', 'First'} and not allowed_seats:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'{payload.class_type} class is not available on this aircraft configuration.',
+        )
 
     if payload.random_allotment:
-        capacity = db.query(Aircraft.total_capacity).filter(Aircraft.aircraft_id == flight.aircraft_id).scalar() or 0
         booked_or_locked = {
             seat
             for (seat,) in db.query(Booking.seat_number)
@@ -389,12 +471,21 @@ def create_booking(
             .all()
         }
         unavailable = booked_or_locked.union(locked_seats)
-        options = [seat for seat in _seat_candidates(capacity) if seat not in unavailable]
+        options = [seat for seat in sorted(allowed_seats, key=_seat_index) if seat not in unavailable]
         if not options:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='No seats available for random allotment.')
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f'No {payload.class_type} seats available for random allotment.',
+            )
         seat_number = random.choice(options)
     elif not seat_number:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat number is required when random allotment is disabled.')
+
+    if seat_number not in allowed_seats:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'Seat {seat_number} does not belong to {payload.class_type} class for this aircraft.',
+        )
 
     foreign_lock = (
         db.query(SeatLock)
@@ -420,7 +511,10 @@ def create_booking(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Seat lock option selected, but active lock not found for this seat.')
 
     surcharge = lock_surcharge if payload.use_seat_lock and active_lock else 0.0
-    total_amount = float(flight.base_price) + payload.tax_amount + payload.service_charge + surcharge
+    class_multiplier = _class_fare_multiplier(payload.class_type)
+    class_adjusted_fare = float(flight.base_price) * class_multiplier
+    total_amount = class_adjusted_fare + payload.tax_amount + payload.service_charge + surcharge
+    total_amount = round(total_amount, 2)
     booking_reference = _generate_booking_reference(db)
 
     booking = Booking(
@@ -514,6 +608,51 @@ def retrieve_booking(
         booking_status=booking_row.status,
         total_amount=float(booking_row.total_amount),
     )
+
+
+@app.get('/bookings/current', response_model=list[CurrentBookingResponse])
+def list_current_bookings(
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(require_roles('Passenger', 'Admin')),
+) -> list[CurrentBookingResponse]:
+    query = (
+        db.query(
+            Booking.booking_reference,
+            Passenger.first_name,
+            Passenger.last_name,
+            Flight.flight_number,
+            Flight.departure_time,
+            Flight.arrival_time,
+            Booking.seat_number,
+            Booking.class_type,
+            Booking.status,
+            Booking.total_amount,
+        )
+        .join(Passenger, Passenger.passenger_id == Booking.passenger_id)
+        .join(Flight, Flight.flight_id == Booking.flight_id)
+        .filter(Flight.departure_time >= datetime.now())
+        .filter(Booking.status != 'Cancelled')
+        .order_by(Flight.departure_time.asc())
+    )
+
+    if current_user.role == 'Passenger':
+        query = query.filter(Booking.passenger_id == current_user.passenger_id)
+
+    rows = query.limit(100).all()
+    return [
+        CurrentBookingResponse(
+            booking_reference=row.booking_reference,
+            passenger_name=f'{row.first_name} {row.last_name}',
+            flight_number=row.flight_number,
+            departure_time=row.departure_time,
+            arrival_time=row.arrival_time,
+            seat_number=row.seat_number,
+            class_type=row.class_type,
+            booking_status=row.status,
+            total_amount=float(row.total_amount),
+        )
+        for row in rows
+    ]
 
 
 @app.get('/bookings/{pnr}/ticket', response_model=BookingDetailResponse)

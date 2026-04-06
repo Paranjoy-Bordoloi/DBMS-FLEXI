@@ -9,10 +9,16 @@ import AdminDashboardPage from './pages/AdminDashboardPage'
 import LoginPage from './pages/LoginPage'
 import ManageBookingPage from './pages/ManageBookingPage'
 import SearchPage from './pages/SearchPage'
+import SignupPage from './pages/SignupPage'
 
 function App() {
   const [me, setMe] = useState(getSavedUser())
   const [booting, setBooting] = useState(true)
+
+  function handleLogout() {
+    clearToken()
+    setMe(null)
+  }
 
   useEffect(() => {
     let active = true
@@ -55,9 +61,10 @@ function App() {
 
   return (
     <BrowserRouter>
-      {me ? <TopNav me={me} /> : null}
+      {me ? <TopNav me={me} onLogout={handleLogout} /> : null}
       <Routes>
         <Route path="/login" element={<LoginPage onLogin={setMe} />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route
           path="/search"
           element={

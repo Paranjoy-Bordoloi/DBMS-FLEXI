@@ -1,18 +1,31 @@
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { fetchMe, login, saveToken, saveUser } from '../lib/api'
 
 export default function LoginPage({ onLogin }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [email, setEmail] = useState('testuser1@example.com')
-  const [password, setPassword] = useState('Test@1234')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const signupEmail = location.state?.signupEmail
+    const signupSuccess = location.state?.signupSuccess
+    if (signupEmail) {
+      setEmail(signupEmail)
+    }
+    if (signupSuccess) {
+      setMessage(signupSuccess)
+    }
+  }, [location.state])
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    setMessage('')
     setLoading(true)
 
     try {
@@ -60,11 +73,16 @@ export default function LoginPage({ onLogin }) {
           </label>
 
           {error ? <p className="error-msg">{error}</p> : null}
+          {message ? <p className="success-msg">{message}</p> : null}
 
           <button type="submit" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <p className="auth-switch">
+          New user? <Link to="/signup">Create a passenger account</Link>
+        </p>
       </section>
     </main>
   )

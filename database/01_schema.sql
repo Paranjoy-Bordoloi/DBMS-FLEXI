@@ -67,13 +67,12 @@ CREATE TABLE passenger (
     last_name VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     phone VARCHAR(20) NOT NULL,
-    address VARCHAR(255),
     passport_number VARCHAR(20) NOT NULL UNIQUE,
+    date_of_birth DATE NOT NULL,
+    address VARCHAR(255),
     frequent_flyer_number VARCHAR(30) UNIQUE,
-    age INT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT chk_passenger_age CHECK (age IS NULL OR age >= 0)
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE app_user (

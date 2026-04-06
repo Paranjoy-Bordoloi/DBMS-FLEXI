@@ -14,7 +14,24 @@ VALUES
 ('HYD', 'Rajiv Gandhi International Airport', 'Hyderabad', 'India', 'Asia/Kolkata'),
 ('MAA', 'Chennai International Airport', 'Chennai', 'India', 'Asia/Kolkata'),
 ('CCU', 'Netaji Subhas Chandra Bose International Airport', 'Kolkata', 'India', 'Asia/Kolkata'),
-('GOI', 'Goa International Airport', 'Goa', 'India', 'Asia/Kolkata');
+('GOI', 'Goa International Airport', 'Goa', 'India', 'Asia/Kolkata'),
+('AMD', 'Sardar Vallabhbhai Patel International Airport', 'Ahmedabad', 'India', 'Asia/Kolkata'),
+('ATQ', 'Sri Guru Ram Dass Jee International Airport', 'Amritsar', 'India', 'Asia/Kolkata'),
+('BHO', 'Raja Bhoj Airport', 'Bhopal', 'India', 'Asia/Kolkata'),
+('COK', 'Cochin International Airport', 'Kochi', 'India', 'Asia/Kolkata'),
+('IXB', 'Bagdogra Airport', 'Siliguri', 'India', 'Asia/Kolkata'),
+('IXC', 'Shaheed Bhagat Singh International Airport', 'Chandigarh', 'India', 'Asia/Kolkata'),
+('IXR', 'Birsa Munda Airport', 'Ranchi', 'India', 'Asia/Kolkata'),
+('JAI', 'Jaipur International Airport', 'Jaipur', 'India', 'Asia/Kolkata'),
+('LKO', 'Chaudhary Charan Singh International Airport', 'Lucknow', 'India', 'Asia/Kolkata'),
+('NAG', 'Dr. Babasaheb Ambedkar International Airport', 'Nagpur', 'India', 'Asia/Kolkata'),
+('PAT', 'Jay Prakash Narayan International Airport', 'Patna', 'India', 'Asia/Kolkata'),
+('RPR', 'Swami Vivekananda Airport', 'Raipur', 'India', 'Asia/Kolkata'),
+('SXR', 'Sheikh ul-Alam International Airport', 'Srinagar', 'India', 'Asia/Kolkata'),
+('TIR', 'Tirupati Airport', 'Tirupati', 'India', 'Asia/Kolkata'),
+('TRV', 'Trivandrum International Airport', 'Thiruvananthapuram', 'India', 'Asia/Kolkata'),
+('UDR', 'Maharana Pratap Airport', 'Udaipur', 'India', 'Asia/Kolkata'),
+('VNS', 'Lal Bahadur Shastri International Airport', 'Varanasi', 'India', 'Asia/Kolkata');
 
 INSERT INTO route (origin_code, dest_code, distance_km, estimated_duration_minutes)
 VALUES
@@ -50,15 +67,15 @@ VALUES
 ('AI910', 10, 4, '2026-03-18 07:15:00', '2026-03-18 09:40:00', 5750.00, 'Scheduled', 242),
 ('6E911', 11, 2, '2026-03-18 18:30:00', '2026-03-18 19:40:00', 2650.00, 'Scheduled', 189);
 
-INSERT INTO passenger (first_name, last_name, email, phone, address, passport_number, frequent_flyer_number, age)
+INSERT INTO passenger (first_name, last_name, email, phone, passport_number, date_of_birth, address, frequent_flyer_number)
 VALUES
-('Paranjoy', 'Bordoloi', 'paranjoy@example.com', '9999000011', 'Pune, India', 'P1234567', 'FF1001', 20),
-('Divyaansh', 'Parmar', 'divyaansh@example.com', '9999000022', 'Pune, India', 'P1234568', 'FF1002', 20),
-('Parth', 'Giri', 'parth@example.com', '9999000033', 'Pune, India', 'P1234569', 'FF1003', 20),
-('Aarav', 'Shah', 'aarav.shah@example.com', '9999000044', 'Mumbai, India', 'P2234561', 'FF1004', 29),
-('Ira', 'Menon', 'ira.menon@example.com', '9999000055', 'Delhi, India', 'P2234562', 'FF1005', 31),
-('Kabir', 'Sood', 'kabir.sood@example.com', '9999000066', 'Bengaluru, India', 'P2234563', 'FF1006', 27),
-('Meera', 'Rao', 'meera.rao@example.com', '9999000077', 'Hyderabad, India', 'P2234564', 'FF1007', 33);
+('Paranjoy', 'Bordoloi', 'paranjoy@example.com', '9999000011', 'P1234567', '2005-08-12', 'Pune, India', 'FF1001'),
+('Divyaansh', 'Parmar', 'divyaansh@example.com', '9999000022', 'P1234568', '2005-03-19', 'Pune, India', 'FF1002'),
+('Parth', 'Giri', 'parth@example.com', '9999000033', 'P1234569', '2005-11-02', 'Pune, India', 'FF1003'),
+('Aarav', 'Shah', 'aarav.shah@example.com', '9999000044', 'P2234561', '1996-06-14', 'Mumbai, India', 'FF1004'),
+('Ira', 'Menon', 'ira.menon@example.com', '9999000055', 'P2234562', '1994-01-27', 'Delhi, India', 'FF1005'),
+('Kabir', 'Sood', 'kabir.sood@example.com', '9999000066', 'P2234563', '1998-09-09', 'Bengaluru, India', 'FF1006'),
+('Meera', 'Rao', 'meera.rao@example.com', '9999000077', 'P2234564', '1992-12-05', 'Hyderabad, India', 'FF1007');
 
 INSERT INTO employee (first_name, last_name, role, date_hired, email, phone, salary, license_number, language_skills, access_level)
 VALUES
@@ -71,7 +88,7 @@ VALUES
 (1, NULL, 'paranjoy@example.com', '$2b$12$placeholderhashforpassenger1', 'Passenger'),
 (2, NULL, 'divyaansh@example.com', '$2b$12$placeholderhashforpassenger2', 'Passenger'),
 (3, NULL, 'parth@example.com', '$2b$12$placeholderhashforpassenger3', 'Passenger'),
-(NULL, 3, 'admin@airline.com', '$2b$12$placeholderhashforadminuser', 'Admin');
+(NULL, 3, 'admin@airline.com', 'pbkdf2_sha256$310000$Iicx3KA9+Wdc8ArvReLMAw==$PYED2ArWbqs/eUtGxc4Y8VNIdvxEzBAodCghAJ5hftU=', 'Admin');
 
 INSERT INTO crew_assignment (employee_id, flight_id, role_in_flight)
 VALUES

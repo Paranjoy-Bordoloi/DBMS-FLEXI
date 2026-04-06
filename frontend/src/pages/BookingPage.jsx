@@ -112,6 +112,7 @@ export default function BookingPage() {
   return (
     <main className="page">
       <section className="panel booking-hero">
+        <p className="page-kicker">Reservation Workspace</p>
         <h2>Book Ticket</h2>
         <p className="subtle">
           Signed in as {me?.email || 'loading...'} | User ID: {userId || '-'} | Passenger ID: {passengerId || '-'}

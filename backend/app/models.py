@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import BigInteger, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -20,10 +20,10 @@ class Passenger(Base):
     last_name: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     passport_number: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    date_of_birth: Mapped[Date] = mapped_column(Date, nullable=False)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     frequent_flyer_number: Mapped[str | None] = mapped_column(String(30), nullable=True, unique=True)
-    age: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user = relationship('AppUser', back_populates='passenger', uselist=False)
 

@@ -36,9 +36,10 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="page">
-      <section className="panel">
+      <section className="panel panel-hero">
         <div className="panel-header">
           <div>
+            <p className="page-kicker">Operations Snapshot</p>
             <h2>Admin Dashboard</h2>
             <p className="subtle">Data source: Java/Tomcat service (`/admin/dashboard/summary`).</p>
           </div>
