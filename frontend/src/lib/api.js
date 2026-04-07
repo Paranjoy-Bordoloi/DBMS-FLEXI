@@ -71,6 +71,13 @@ export async function searchFlights(params) {
   return response.data
 }
 
+export async function fetchSeatMap(flightId, classType) {
+  const response = await api.get(`/flights/${flightId}/seat-map`, {
+    params: classType ? { class_type: classType } : undefined,
+  })
+  return response.data
+}
+
 export async function fetchAirports() {
   const response = await api.get('/airports')
   return response.data
@@ -98,12 +105,65 @@ export async function fetchCurrentBookings() {
   return response.data
 }
 
+export async function fetchAdminBookings(params = {}) {
+  const response = await api.get('/admin/bookings', { params })
+  return response.data
+}
+
 export async function cancelBooking(pnr, reason) {
   const response = await api.post(`/bookings/${pnr}/cancel`, { reason })
   return response.data
 }
 
+export async function changeBookingSeat(pnr, newSeatNumber) {
+  const response = await api.post(`/bookings/${pnr}/change-seat`, {
+    new_seat_number: newSeatNumber,
+  })
+  return response.data
+}
+
+export async function changeBookingFlight(pnr, payload) {
+  const response = await api.post(`/bookings/${pnr}/change-flight`, payload)
+  return response.data
+}
+
 export async function fetchAdminDashboardSummary() {
   const response = await adminApi.get('/dashboard/summary')
+  return response.data
+}
+
+export async function fetchOperationsAircraftUtilization(nextDays = 14) {
+  const response = await api.get('/admin/operations/utilization/aircraft', {
+    params: { next_days: nextDays },
+  })
+  return response.data
+}
+
+export async function fetchOperationsCrewUtilization(nextDays = 14) {
+  const response = await api.get('/admin/operations/utilization/crew', {
+    params: { next_days: nextDays },
+  })
+  return response.data
+}
+
+export async function fetchOperationsAuditLogs(limit = 50) {
+  const response = await api.get('/admin/operations/audit-logs', {
+    params: { limit },
+  })
+  return response.data
+}
+
+export async function cancelFlightOperation(flightId, payload) {
+  const response = await api.post(`/admin/operations/flights/${flightId}/cancel`, payload)
+  return response.data
+}
+
+export async function retimeFlightOperation(flightId, payload) {
+  const response = await api.post(`/admin/operations/flights/${flightId}/retime`, payload)
+  return response.data
+}
+
+export async function swapAircraftOperation(flightId, payload) {
+  const response = await api.post(`/admin/operations/flights/${flightId}/swap-aircraft`, payload)
   return response.data
 }

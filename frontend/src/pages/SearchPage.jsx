@@ -15,8 +15,12 @@ export default function SearchPage() {
   const [originCode, setOriginCode] = useState('')
   const [destinationCode, setDestinationCode] = useState('')
   const [travelDate, setTravelDate] = useState(getTodayLocalDate())
+  const [flexDays, setFlexDays] = useState('0')
   const [sortBy, setSortBy] = useState('price')
   const [sortOrder, setSortOrder] = useState('asc')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [departureFromHour, setDepartureFromHour] = useState('')
+  const [departureToHour, setDepartureToHour] = useState('')
   const [flights, setFlights] = useState([])
   const [airports, setAirports] = useState([])
   const [error, setError] = useState('')
@@ -61,8 +65,16 @@ export default function SearchPage() {
         origin_code: normalizeAirportInput(originCode),
         destination_code: normalizeAirportInput(destinationCode),
         travel_date: travelDate,
+        flex_days: Number(flexDays),
         sort_by: sortBy,
         sort_order: sortOrder,
+        ...(maxPrice ? { max_price: Number(maxPrice) } : {}),
+        ...(departureFromHour !== '' && departureToHour !== ''
+          ? {
+              departure_from_hour: Number(departureFromHour),
+              departure_to_hour: Number(departureToHour),
+            }
+          : {}),
       })
       setFlights(data)
     } catch (err) {
@@ -122,6 +134,51 @@ export default function SearchPage() {
           </label>
 
           <label>
+            Flexible Days
+            <select value={flexDays} onChange={(e) => setFlexDays(e.target.value)}>
+              <option value="0">Exact date</option>
+              <option value="1">+/- 1 day</option>
+              <option value="2">+/- 2 days</option>
+              <option value="3">+/- 3 days</option>
+            </select>
+          </label>
+
+          <label>
+            Max Economy Price
+            <input
+              type="number"
+              min="0"
+              placeholder="Optional"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+            />
+          </label>
+
+          <label>
+            Departure From (hour)
+            <input
+              type="number"
+              min="0"
+              max="23"
+              placeholder="Optional"
+              value={departureFromHour}
+              onChange={(e) => setDepartureFromHour(e.target.value)}
+            />
+          </label>
+
+          <label>
+            Departure To (hour)
+            <input
+              type="number"
+              min="0"
+              max="23"
+              placeholder="Optional"
+              value={departureToHour}
+              onChange={(e) => setDepartureToHour(e.target.value)}
+            />
+          </label>
+
+          <label>
             Sort By
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
               <option value="price">Price</option>
@@ -161,7 +218,9 @@ export default function SearchPage() {
                   <p>
                     Departs: {new Date(flight.departure_time).toLocaleString()}
                   </p>
-                  <p>Price: INR {flight.price}</p>
+                  <p>Economy: INR {flight.economy_price}</p>
+                  <p>Business: INR {flight.business_price}</p>
+                  <p>First: INR {flight.first_price}</p>
                   <p>Available Seats: {flight.available_seats}</p>
                 </div>
                 <button type="button" onClick={() => handleSelectFlight(flight.flight_id)}>

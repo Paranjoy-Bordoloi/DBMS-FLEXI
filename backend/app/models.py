@@ -152,3 +152,42 @@ class Refund(Base):
         Enum('Pending', 'Processed', 'Rejected', name='refund_status_type'),
         nullable=False,
     )
+
+
+class Employee(Base):
+    __tablename__ = 'employee'
+
+    employee_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    role: Mapped[str] = mapped_column(Enum('Pilot', 'CabinCrew', 'AdminStaff', name='employee_role'), nullable=False)
+    date_hired: Mapped[Date] = mapped_column(Date, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+
+class CrewAssignment(Base):
+    __tablename__ = 'crew_assignment'
+
+    assignment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('employee.employee_id'), nullable=False)
+    flight_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('flight.flight_id'), nullable=False)
+    role_in_flight: Mapped[str] = mapped_column(
+        Enum('Pilot', 'Co-Pilot', 'CabinCrew', 'HeadSteward', name='role_in_flight_type'),
+        nullable=False,
+    )
+    assigned_at: Mapped[DateTime] = mapped_column(DateTime, nullable=False)
+
+
+class OperationalAuditLog(Base):
+    __tablename__ = 'operational_audit_log'
+
+    audit_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    action_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    actor_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('app_user.user_id'), nullable=False)
+    action_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    action_notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime, nullable=False)

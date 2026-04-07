@@ -81,7 +81,9 @@ INSERT INTO employee (first_name, last_name, role, date_hired, email, phone, sal
 VALUES
 ('Aman', 'Sharma', 'Pilot', '2022-01-01', 'aman.sharma@airline.com', '9000011111', 1800000.00, 'LIC1001', NULL, NULL),
 ('Nina', 'Davis', 'CabinCrew', '2023-06-15', 'nina.davis@airline.com', '9000022222', 650000.00, NULL, 'English,Hindi', NULL),
-('Rohit', 'Mehta', 'AdminStaff', '2021-03-11', 'rohit.mehta@airline.com', '9000033333', 900000.00, NULL, NULL, 'OperationsAdmin');
+('Rohit', 'Mehta', 'AdminStaff', '2021-03-11', 'rohit.mehta@airline.com', '9000033333', 900000.00, NULL, NULL, 'OperationsAdmin'),
+('Sneha', 'Iyer', 'Pilot', '2019-08-21', 'sneha.iyer@airline.com', '9000044444', 1750000.00, 'LIC1002', NULL, NULL),
+('Tariq', 'Khan', 'CabinCrew', '2024-02-10', 'tariq.khan@airline.com', '9000055555', 620000.00, NULL, 'English,Hindi', NULL);
 
 INSERT INTO app_user (passenger_id, employee_id, email, password_hash, role)
 VALUES
@@ -94,7 +96,27 @@ INSERT INTO crew_assignment (employee_id, flight_id, role_in_flight)
 VALUES
 (1, 1, 'Pilot'),
 (2, 1, 'CabinCrew'),
-(1, 2, 'Co-Pilot');
+(4, 1, 'Co-Pilot'),
+(5, 1, 'CabinCrew'),
+(1, 2, 'Pilot'),
+(2, 2, 'CabinCrew'),
+(4, 3, 'Co-Pilot'),
+(5, 4, 'CabinCrew'),
+(1, 5, 'Pilot'),
+(4, 6, 'Co-Pilot'),
+(2, 7, 'CabinCrew'),
+(5, 8, 'CabinCrew'),
+(1, 9, 'Pilot'),
+(4, 10, 'Co-Pilot'),
+(2, 11, 'CabinCrew');
+
+INSERT INTO operational_audit_log (action_type, entity_type, entity_id, actor_user_id, action_status, action_notes, metadata_json, created_at)
+VALUES
+('CREATE_ROUTE', 'Route', '1', 4, 'SUCCESS', 'Seed route created', '{"origin_code":"PNQ","dest_code":"DEL"}', '2026-03-01 09:00:00'),
+('CREATE_AIRCRAFT', 'Aircraft', '1', 4, 'SUCCESS', 'Seed aircraft added', '{"registration_number":"VT-AX1"}', '2026-03-01 09:05:00'),
+('CREATE_FLIGHT', 'Flight', '1', 4, 'SUCCESS', 'Seed flight created', '{"flight_number":"AI201"}', '2026-03-01 09:10:00'),
+('DISRUPTION_RETIME_FLIGHT', 'Flight', '7', 4, 'SUCCESS', 'Weather adjustment applied', '{"new_departure_time":"2026-03-17T07:10:00"}', '2026-03-10 12:00:00'),
+('DISRUPTION_CANCEL_FLIGHT', 'Flight', '8', 4, 'SUCCESS', 'Cancelled for maintenance', '{"auto_reaccommodate":true}', '2026-03-12 13:00:00');
 
 INSERT INTO booking (booking_reference, passenger_id, flight_id, seat_number, class_type, status, total_amount)
 VALUES

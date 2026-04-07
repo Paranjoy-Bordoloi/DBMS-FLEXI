@@ -67,6 +67,7 @@ flowchart LR
 
 ### Admin Features
 - Dashboard summary (bookings, confirmations, revenue, occupancy)
+- Booking Explorer in Admin Dashboard with filters (status, flight, passenger, email, limit)
 - Admin endpoint split via Java servlet service
 - Operational APIs for route, aircraft, and flight maintenance
 
@@ -151,9 +152,13 @@ mvn clean package
 | Flights | GET | `/flights/search` | Flight search by route/date |
 | Booking | POST | `/bookings/seat-lock` | Temporary seat hold |
 | Booking | POST | `/bookings` | Booking + payment creation |
+| Booking | GET | `/bookings/current` | Current user's future bookings (or admin: all) |
 | Booking | GET | `/bookings/retrieve` | Retrieve booking details |
 | Booking | GET | `/bookings/{pnr}/ticket` | Ticket view |
 | Booking | POST | `/bookings/{pnr}/cancel` | Booking cancellation + refund |
+| Booking | POST | `/bookings/{pnr}/change-seat` | Change seat on confirmed booking |
+| Booking | POST | `/bookings/{pnr}/change-flight` | Rebook to different flight |
+| Admin | GET | `/admin/bookings` | List all bookings (admin only) |
 | Admin (Java) | GET | `/admin/health` | Tomcat service health |
 | Admin (Java) | GET | `/admin/dashboard/summary` | Dashboard metrics |
 
@@ -196,6 +201,59 @@ What the importer does:
 - fetches schedules from AeroDataBox
 - upserts `airport`, `airline`, `route`, and `flight`
 - updates existing flights by `(flight_number, departure_time)`
+
+## Bulk Demo Bookings
+
+When you have many flights and want realistic booking volume without manual booking, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\seed_bulk_bookings.py --all-flights --bookings-per-flight 4
+```
+
+The script by default:
+- Creates **200 synthetic passengers** if the passenger table is empty (ensures diverse bookings)
+- Processes all eligible future flights
+- Distributes bookings across multiple passengers for realism
+
+Useful options:
+- `--target-passenger-id 1`: create all generated bookings under one passenger account (useful for Manage Booking demo)
+- `--skip-passenger-creation`: disable auto-creation of synthetic passengers
+- `--auto-create-passengers 500`: create a custom number of synthetic passengers
+- `--dry-run`: preview inserts without writing to database
+- `--max-flights 100`: process only first N future flights instead of `--all-flights`
+
+### Admin Booking List API
+
+Admin users can view **all bookings by all passengers** via the `/admin/bookings` endpoint with powerful filtering:
+
+```
+GET /admin/bookings
+GET /admin/bookings?status=Confirmed
+GET /admin/bookings?flight_id=5
+GET /admin/bookings?passenger_id=3
+GET /admin/bookings?passenger_email=john
+GET /admin/bookings?flight_id=5&status=Confirmed
+GET /admin/bookings?status=Cancelled&limit=1000
+```
+
+**Query Parameters:**
+- `status`: Filter by Pending, Confirmed, or Cancelled
+- `flight_id`: Show only bookings for a specific flight
+- `passenger_id`: Show only bookings by a specific passenger
+- `passenger_email`: Search by partial email match
+- `limit`: Results per page (default 500, max 5000)
+
+### Admin UI Booking Filters
+
+In the React Admin Dashboard route (`/admin`), the **Booking Explorer** panel exposes the same filters used by the API:
+
+- Status
+- Flight ID
+- Passenger ID
+- Passenger Email (partial match)
+- Limit
+
+Use **Apply Filters** to query matching rows and **Clear Filters** to reset back to the default view.
 
 ## Screenshots
 

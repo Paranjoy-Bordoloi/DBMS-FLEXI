@@ -5,11 +5,10 @@
   display: grid;
   gap: 14px;
   padding: 14px 24px;
-  border-bottom: 1px solid #bfd3e8;
-  background:
-    linear-gradient(120deg, rgba(235, 249, 255, 0.92) 0%, rgba(255, 246, 235, 0.92) 62%),
-    #ffffff;
-  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(255, 253, 248, 0.96);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 24px rgba(29, 42, 53, 0.05);
 }
 
 .nav-top {
@@ -54,7 +53,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0c7b59, #106c9f);
+  background: var(--accent);
   color: #fff;
   font-weight: 700;
 }
@@ -77,8 +76,9 @@
 
 .account-pill button {
   border-radius: 999px;
-  background: #162f57;
-  padding: 8px 14px;
+  background: var(--accent-2);
+  padding: 8px 12px;
+  min-height: 36px;
 }
 
 .link-row {
@@ -98,9 +98,9 @@
 }
 
 .nav-link.active {
-  background: #0c7b59;
+  background: var(--accent);
   color: #fff;
-  border-color: #0c7b59;
+  border-color: var(--accent);
 }
 
 .boot-screen {
@@ -124,31 +124,23 @@
 .auth-card,
 .panel {
   position: relative;
-  background: linear-gradient(165deg, #ffffffec, #f9fbffdf);
-  border: 1px solid #c4d6e8;
+  background: var(--surface);
+  border: 1px solid var(--panel-border);
+  border-top: 4px solid var(--accent);
   border-radius: 20px;
   padding: 22px;
   backdrop-filter: blur(6px);
-  box-shadow: 0 14px 28px rgba(24, 47, 84, 0.08);
-}
-
-.panel::before,
-.auth-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 6px;
-  border-radius: 20px 20px 0 0;
-  background: linear-gradient(90deg, #0c7b59, #1379ac, #f08a39);
+  box-shadow: 0 12px 24px rgba(29, 42, 53, 0.06);
 }
 
 .booking-hero {
-  background: linear-gradient(125deg, #e9fff4, #edf6ff 55%, #fff3e8);
+  background: var(--surface-soft);
+  border-top-color: var(--accent);
 }
 
 .panel-hero {
-  background: linear-gradient(120deg, #ecfff5, #eef6ff 55%, #fff6ea);
+  background: var(--surface-soft);
+  border-top-color: var(--accent-2);
 }
 
 .auth-card {
@@ -170,7 +162,7 @@
   font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: #1b7d5f;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -210,7 +202,7 @@ button {
 input,
 select {
   border-radius: 10px;
-  border: 1px solid #b7cde1;
+  border: 1px solid #c7d0d9;
   padding: 10px 12px;
   background: #fff;
 }
@@ -218,17 +210,18 @@ select {
 input:focus,
 select:focus {
   outline: none;
-  border-color: #1b7d5f;
-  box-shadow: 0 0 0 3px rgba(12, 123, 89, 0.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus);
 }
 
 button {
   border: none;
   border-radius: 10px;
-  background: #0c7b59;
+  background: var(--accent);
   color: #fff;
   font-weight: 700;
-  padding: 10px 14px;
+  padding: 9px 12px;
+  min-height: 40px;
   cursor: pointer;
 }
 
@@ -245,10 +238,10 @@ button:disabled {
 .flight-card,
 .result-card,
 .success-box {
-  border: 1px solid #c1d4e7;
+  border: 1px solid var(--panel-border);
   border-radius: 14px;
   padding: 14px;
-  background: linear-gradient(150deg, #ffffff, #f6fbff);
+  background: var(--surface);
 }
 
 .flight-card {
@@ -287,9 +280,10 @@ button:disabled {
 
 .stat-card {
   border: 1px solid var(--panel-border);
+  border-top: 3px solid var(--accent-warm);
   border-radius: 14px;
   padding: 14px;
-  background: linear-gradient(145deg, #ffffff, #f5fbff);
+  background: var(--surface);
 }
 
 .stat-label {
@@ -309,13 +303,13 @@ button:disabled {
 }
 
 .error-msg {
-  color: #a11919;
+  color: #9d2828;
   font-weight: 700;
   margin-top: 8px;
 }
 
 .success-msg {
-  color: #0c7b59;
+  color: var(--accent);
   font-weight: 700;
   margin-top: 8px;
 }
@@ -329,7 +323,7 @@ button:disabled {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 12px;
-  color: #0c7b59;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -340,7 +334,7 @@ button:disabled {
 }
 
 .auth-switch a {
-  color: #0c7b59;
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -364,11 +358,11 @@ button:disabled {
 }
 
 .rule.valid {
-  color: #11724f;
+  color: var(--accent);
 }
 
 .rule.invalid {
-  color: #8a2d2d;
+  color: #9d2828;
 }
 
 .rule.valid::before,
@@ -408,4 +402,51 @@ button:disabled {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.grid-form > button,
+.panel-header > button,
+.account-pill button,
+.result-card > button,
+.flight-card > button {
+  width: fit-content;
+  min-width: 160px;
+  justify-self: end;
+}
+
+.grid-form > button {
+  padding-inline: 18px;
+}
+
+.panel-header > button {
+  min-width: 124px;
+}
+
+.account-pill button {
+  min-width: 92px;
+}
+
+.flight-card > button {
+  min-width: 112px;
+}
+
+.grid-form {
+  align-items: start;
+}
+
+.grid-form > label {
+  min-width: 0;
+}
+
+.seat-map-panel {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.seat-map-panel .seat-grid button {
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 6px;
 }

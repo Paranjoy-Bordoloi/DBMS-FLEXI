@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createBooking, fetchMe, lockSeat } from '../lib/api'
+import { createBooking, fetchMe, fetchSeatMap, lockSeat } from '../lib/api'
 
 export default function BookingPage() {
   const [me, setMe] = useState(null)
@@ -13,6 +13,8 @@ export default function BookingPage() {
   const [taxAmount, setTaxAmount] = useState('500')
   const [serviceCharge, setServiceCharge] = useState('150')
   const [lockResult, setLockResult] = useState(null)
+  const [seatMap, setSeatMap] = useState([])
+  const [loadingSeatMap, setLoadingSeatMap] = useState(false)
   const [bookingResult, setBookingResult] = useState(null)
   const [error, setError] = useState('')
   const [loadingLock, setLoadingLock] = useState(false)
@@ -35,6 +37,41 @@ export default function BookingPage() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadSeatMap() {
+      if (!flightId || randomAllotment) {
+        if (active) {
+          setSeatMap([])
+        }
+        return
+      }
+
+      setLoadingSeatMap(true)
+      try {
+        const data = await fetchSeatMap(Number(flightId), classType)
+        if (active) {
+          setSeatMap(data?.seats || [])
+        }
+      } catch (err) {
+        if (active) {
+          setSeatMap([])
+          setError(err?.response?.data?.detail || 'Could not load seat map.')
+        }
+      } finally {
+        if (active) {
+          setLoadingSeatMap(false)
+        }
+      }
+    }
+
+    loadSeatMap()
+    return () => {
+      active = false
+    }
+  }, [flightId, classType, randomAllotment])
 
   const userId = useMemo(() => me?.user_id || '', [me])
   const passengerId = useMemo(() => me?.passenger_id || '', [me])
@@ -200,7 +237,15 @@ export default function BookingPage() {
 
           <label>
             Class Type
-            <select value={classType} onChange={(e) => setClassType(e.target.value)}>
+            <select
+              value={classType}
+              onChange={(e) => {
+                setClassType(e.target.value)
+                if (!randomAllotment) {
+                  setSeatNumber('')
+                }
+              }}
+            >
               <option value="Economy">Economy</option>
               <option value="Business">Business</option>
               <option value="First">First</option>
@@ -241,6 +286,41 @@ export default function BookingPage() {
             {loadingBooking ? 'Booking...' : '2. Confirm Booking'}
           </button>
         </form>
+
+        {!randomAllotment ? (
+          <div className="seat-map-panel">
+            <p className="subtle">Seat map ({classType})</p>
+            {loadingSeatMap ? <p className="subtle">Loading seats...</p> : null}
+            {!loadingSeatMap ? (
+              <div className="seat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(54px, 1fr))', gap: '8px' }}>
+                {seatMap
+                  .filter((seat) => seat.cabin_class === classType)
+                  .map((seat) => {
+                    const unavailable = seat.status !== 'Available'
+                    const selected = seatNumber === seat.seat_number
+                    return (
+                      <button
+                        key={seat.seat_number}
+                        type="button"
+                        disabled={unavailable}
+                        onClick={() => setSeatNumber(seat.seat_number)}
+                        style={{
+                          padding: '8px 6px',
+                          borderRadius: '8px',
+                          border: selected ? '2px solid #1b5e20' : '1px solid #b7c3d0',
+                          background: unavailable ? '#f3f5f7' : selected ? '#d7f5df' : '#ffffff',
+                          color: unavailable ? '#8b95a1' : '#1d2a35',
+                        }}
+                        title={`${seat.seat_number} • ${seat.seat_type} • ${seat.status}`}
+                      >
+                        {seat.seat_number}
+                      </button>
+                    )
+                  })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {useSeatLock ? <p className="subtle">Lock surcharge will be included in total fare.</p> : null}
 

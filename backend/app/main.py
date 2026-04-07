@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta
+import json
 import random
 import string
 
@@ -6,23 +7,48 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy.exc import DatabaseError, IntegrityError
-from sqlalchemy import asc, desc, func
+from sqlalchemy.exc import DatabaseError, IntegrityError, OperationalError
+from sqlalchemy import asc, desc, func, text
 from sqlalchemy.orm import Session
 
 from .config import settings
-from .database import get_db
-from .models import Aircraft, Airline, Airport, AppUser, Booking, Flight, Passenger, Payment, Refund, Route, SeatLock
+from .database import engine, get_db
+from .models import (
+    Aircraft,
+    Airline,
+    Airport,
+    AppUser,
+    Booking,
+    CrewAssignment,
+    Employee,
+    Flight,
+    OperationalAuditLog,
+    Passenger,
+    Payment,
+    Refund,
+    Route,
+    SeatLock,
+)
 from .schemas import (
+    AdminCancelFlightRequest,
     AdminCreateAircraftRequest,
     AdminCreateFlightRequest,
     AdminCreateRouteRequest,
+    AdminReaccommodateResponse,
     AdminMessageResponse,
+    AdminRetimeFlightRequest,
+    AdminSwapAircraftRequest,
     AdminUpdateFlightRequest,
+    AircraftUtilizationResponse,
+    AuditLogResponse,
     AirportOptionResponse,
+    BookingChangeResponse,
     BookingDetailResponse,
     CancelBookingRequest,
     CancelBookingResponse,
+    ChangeFlightRequest,
+    ChangeSeatRequest,
+    CrewUtilizationResponse,
     CreateBookingRequest,
     CreateBookingResponse,
     CurrentBookingResponse,
@@ -32,6 +58,8 @@ from .schemas import (
     LoginRequest,
     ManifestEntryResponse,
     RegisterRequest,
+    SeatMapResponse,
+    SeatMapSeatResponse,
     SeatLockRequest,
     SeatLockResponse,
     TokenResponse,
@@ -47,6 +75,8 @@ CLASS_FARE_MULTIPLIERS: dict[str, float] = {
     'Business': 1.70,
     'First': 2.35,
 }
+
+REBOOKING_CHANGE_FEE = 650.0
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,6 +101,16 @@ def root() -> dict[str, str]:
         'health': '/health',
         'docs': '/docs',
     }
+
+
+@app.on_event('startup')
+def ensure_operational_tables() -> None:
+    # This keeps new operational MVP tables available without requiring a separate migration tool.
+    try:
+        OperationalAuditLog.__table__.create(bind=engine, checkfirst=True)
+    except OperationalError:
+        # If permissions are restricted, existing app features should still run.
+        pass
 
 
 def _validate_password_complexity(password: str) -> None:
@@ -113,6 +153,14 @@ def _calculate_refund_ratio(hours_before_departure: float) -> float:
 
 def _class_fare_multiplier(class_type: str) -> float:
     return CLASS_FARE_MULTIPLIERS.get(class_type, 1.0)
+
+
+def _class_prices(base_price: float) -> dict[str, float]:
+    return {
+        'Economy': round(base_price * CLASS_FARE_MULTIPLIERS['Economy'], 2),
+        'Business': round(base_price * CLASS_FARE_MULTIPLIERS['Business'], 2),
+        'First': round(base_price * CLASS_FARE_MULTIPLIERS['First'], 2),
+    }
 
 
 def _seat_candidates(capacity: int) -> list[str]:
@@ -175,6 +223,59 @@ def _class_seat_numbers(capacity: int, business_seats: int, class_type: str) -> 
         return set(seat_map[business_start:business_cap])
 
     return set(seat_map[business_cap:])
+
+
+def _seat_type_for_number(seat_number: str) -> str:
+    seat = seat_number.strip().upper()
+    letter = ''.join(ch for ch in seat if ch.isalpha())[:1]
+    if letter in {'A', 'F'}:
+        return 'Window'
+    if letter in {'C', 'D'}:
+        return 'Aisle'
+    return 'Middle'
+
+
+def _log_operational_action(
+    db: Session,
+    action_type: str,
+    entity_type: str,
+    entity_id: str,
+    actor_user_id: int,
+    action_status: str,
+    action_notes: str | None = None,
+    metadata: dict | None = None,
+) -> None:
+    record = OperationalAuditLog(
+        action_type=action_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        actor_user_id=actor_user_id,
+        action_status=action_status,
+        action_notes=action_notes,
+        metadata_json=json.dumps(metadata) if metadata else None,
+        created_at=datetime.now(),
+    )
+    db.add(record)
+
+
+def _available_class_seats(db: Session, flight_id: int, class_seats: set[str]) -> list[str]:
+    now = datetime.now()
+    booked_or_locked = {
+        seat
+        for (seat,) in db.query(Booking.seat_number)
+        .filter(Booking.flight_id == flight_id)
+        .filter(Booking.status.in_(['Pending', 'Confirmed']))
+        .all()
+    }
+    locked_seats = {
+        seat
+        for (seat,) in db.query(SeatLock.seat_number)
+        .filter(SeatLock.flight_id == flight_id)
+        .filter(SeatLock.expires_at > now)
+        .all()
+    }
+    unavailable = booked_or_locked.union(locked_seats)
+    return [seat for seat in sorted(class_seats, key=_seat_index) if seat not in unavailable]
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> AppUser:
@@ -274,8 +375,12 @@ def search_flights(
     origin_code: str = Query(min_length=3, max_length=3),
     destination_code: str = Query(min_length=3, max_length=3),
     travel_date: str = Query(description='YYYY-MM-DD'),
+    flex_days: int = Query(default=0, ge=0, le=3),
     sort_by: str = Query(default='price', pattern='^(price|duration)$'),
     sort_order: str = Query(default='asc', pattern='^(asc|desc)$'),
+    max_price: float | None = Query(default=None, ge=0),
+    departure_from_hour: int | None = Query(default=None, ge=0, le=23),
+    departure_to_hour: int | None = Query(default=None, ge=0, le=23),
     db: Session = Depends(get_db),
 ) -> list[FlightSearchResponse]:
     try:
@@ -283,8 +388,8 @@ def search_flights(
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid date format. Use YYYY-MM-DD.') from error
 
-    day_start = datetime.combine(date_value, time.min)
-    day_end = datetime.combine(date_value, time.max)
+    day_start = datetime.combine(date_value - timedelta(days=flex_days), time.min)
+    day_end = datetime.combine(date_value + timedelta(days=flex_days), time.max)
 
     origin_alias = Airport.__table__.alias('origin_airport')
     destination_alias = Airport.__table__.alias('destination_airport')
@@ -312,25 +417,45 @@ def search_flights(
         .filter(Flight.status.in_(['Scheduled', 'Delayed']))
     )
 
+    if max_price is not None:
+        query = query.filter(Flight.base_price <= max_price)
+
+    if departure_from_hour is not None and departure_to_hour is not None:
+        if departure_from_hour <= departure_to_hour:
+            query = query.filter(func.hour(Flight.departure_time) >= departure_from_hour).filter(
+                func.hour(Flight.departure_time) <= departure_to_hour
+            )
+        else:
+            query = query.filter(
+                (func.hour(Flight.departure_time) >= departure_from_hour)
+                | (func.hour(Flight.departure_time) <= departure_to_hour)
+            )
+
     sort_column = Flight.base_price if sort_by == 'price' else Route.estimated_duration_minutes
     ordering = asc(sort_column) if sort_order == 'asc' else desc(sort_column)
     records = query.order_by(ordering).all()
 
-    return [
-        FlightSearchResponse(
-            flight_id=row.flight_id,
-            flight_number=row.flight_number,
-            origin_code=row.origin_code,
-            destination_code=row.dest_code,
-            departure_time=row.departure_time,
-            arrival_time=row.arrival_time,
-            duration_minutes=row.estimated_duration_minutes,
-            price=float(row.base_price),
-            available_seats=row.available_seats,
-            status=row.status,
+    responses: list[FlightSearchResponse] = []
+    for row in records:
+        price_map = _class_prices(float(row.base_price))
+        responses.append(
+            FlightSearchResponse(
+                flight_id=row.flight_id,
+                flight_number=row.flight_number,
+                origin_code=row.origin_code,
+                destination_code=row.dest_code,
+                departure_time=row.departure_time,
+                arrival_time=row.arrival_time,
+                duration_minutes=row.estimated_duration_minutes,
+                price=price_map['Economy'],
+                economy_price=price_map['Economy'],
+                business_price=price_map['Business'],
+                first_price=price_map['First'],
+                available_seats=row.available_seats,
+                status=row.status,
+            )
         )
-        for row in records
-    ]
+    return responses
 
 
 @app.get('/airports', response_model=list[AirportOptionResponse])
@@ -655,6 +780,292 @@ def list_current_bookings(
     ]
 
 
+@app.get('/admin/bookings', response_model=list[BookingDetailResponse])
+def admin_list_all_bookings(
+    status: str | None = Query(default=None, pattern='^(Pending|Confirmed|Cancelled)$'),
+    flight_id: int | None = Query(default=None),
+    passenger_id: int | None = Query(default=None),
+    passenger_email: str | None = Query(default=None),
+    limit: int = Query(default=500, ge=1, le=5000),
+    db: Session = Depends(get_db),
+    _: AppUser = Depends(require_roles('Admin')),
+) -> list[BookingDetailResponse]:
+    """List all bookings across all passengers (admin only).
+    
+    Filters:
+    - status: Pending, Confirmed, or Cancelled
+    - flight_id: bookings for a specific flight
+    - passenger_id: bookings by a specific passenger
+    - passenger_email: bookings by email (partial match)
+    """
+    query = (
+        db.query(
+            Booking.booking_id,
+            Booking.booking_reference,
+            Booking.total_amount,
+            Booking.status,
+            Booking.seat_number,
+            Booking.class_type,
+            Booking.booking_date,
+            Passenger.first_name,
+            Passenger.last_name,
+            Passenger.email,
+            Flight.flight_id,
+            Flight.flight_number,
+            Flight.departure_time,
+            Flight.arrival_time,
+            Route.origin_code,
+            Route.dest_code,
+        )
+        .join(Passenger, Passenger.passenger_id == Booking.passenger_id)
+        .join(Flight, Flight.flight_id == Booking.flight_id)
+        .join(Route, Route.route_id == Flight.route_id)
+        .order_by(Booking.booking_date.desc())
+    )
+
+    if status:
+        query = query.filter(Booking.status == status)
+    if flight_id:
+        query = query.filter(Booking.flight_id == flight_id)
+    if passenger_id:
+        query = query.filter(Booking.passenger_id == passenger_id)
+    if passenger_email:
+        query = query.filter(Passenger.email.ilike(f'%{passenger_email}%'))
+
+    rows = query.limit(limit).all()
+
+    return [
+        BookingDetailResponse(
+            booking_id=row.booking_id,
+            booking_reference=row.booking_reference,
+            passenger_first_name=row.first_name,
+            passenger_last_name=row.last_name,
+            passenger_email=row.email,
+            flight_id=row.flight_id,
+            flight_number=row.flight_number,
+            origin_code=row.origin_code,
+            destination_code=row.dest_code,
+            departure_time=row.departure_time,
+            arrival_time=row.arrival_time,
+            seat_number=row.seat_number,
+            class_type=row.class_type,
+            booking_date=row.booking_date,
+            status=row.status,
+            total_amount=float(row.total_amount),
+        )
+        for row in rows
+    ]
+
+
+@app.get('/flights/{flight_id}/seat-map', response_model=SeatMapResponse)
+def get_flight_seat_map(
+    flight_id: int,
+    class_type: str | None = Query(default=None, pattern='^(Economy|Business|First)$'),
+    db: Session = Depends(get_db),
+    _: AppUser = Depends(require_roles('Passenger', 'Admin')),
+) -> SeatMapResponse:
+    now = datetime.now()
+    flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Flight not found.')
+
+    aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == flight.aircraft_id).first()
+    if not aircraft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Aircraft not found for selected flight.')
+
+    all_seats = _seat_candidates(aircraft.total_capacity)
+    first_zone = _class_seat_numbers(aircraft.total_capacity, aircraft.business_seats, 'First')
+    business_zone = _class_seat_numbers(aircraft.total_capacity, aircraft.business_seats, 'Business')
+    economy_zone = _class_seat_numbers(aircraft.total_capacity, aircraft.business_seats, 'Economy')
+
+    booked = {
+        seat
+        for (seat,) in db.query(Booking.seat_number)
+        .filter(Booking.flight_id == flight_id)
+        .filter(Booking.status.in_(['Pending', 'Confirmed']))
+        .all()
+    }
+    locked = {
+        seat
+        for (seat,) in db.query(SeatLock.seat_number)
+        .filter(SeatLock.flight_id == flight_id)
+        .filter(SeatLock.expires_at > now)
+        .all()
+    }
+
+    seats: list[SeatMapSeatResponse] = []
+    for seat in all_seats:
+        if seat in first_zone:
+            cabin_class = 'First'
+        elif seat in business_zone:
+            cabin_class = 'Business'
+        else:
+            cabin_class = 'Economy'
+
+        status_label = 'Available'
+        if seat in booked:
+            status_label = 'Booked'
+        elif seat in locked:
+            status_label = 'Locked'
+
+        selectable = status_label == 'Available' and (class_type is None or cabin_class == class_type)
+        seats.append(
+            SeatMapSeatResponse(
+                seat_number=seat,
+                cabin_class=cabin_class,
+                seat_type=_seat_type_for_number(seat),
+                status=status_label,
+                is_selectable=selectable,
+            )
+        )
+
+    return SeatMapResponse(
+        flight_id=flight.flight_id,
+        aircraft_id=aircraft.aircraft_id,
+        total_capacity=aircraft.total_capacity,
+        business_seats=aircraft.business_seats,
+        economy_seats=aircraft.economy_seats,
+        seats=seats,
+    )
+
+
+@app.post('/bookings/{pnr}/change-seat', response_model=BookingChangeResponse)
+def change_booking_seat(
+    pnr: str,
+    payload: ChangeSeatRequest,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(require_roles('Passenger', 'Admin')),
+) -> BookingChangeResponse:
+    now = datetime.now()
+    booking = db.query(Booking).filter(Booking.booking_reference == pnr).first()
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Booking not found.')
+
+    if current_user.role == 'Passenger' and booking.passenger_id != current_user.passenger_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='You can only modify your own bookings.')
+
+    if booking.status == 'Cancelled':
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot modify a cancelled booking.')
+
+    flight = db.query(Flight).filter(Flight.flight_id == booking.flight_id).first()
+    if not flight or flight.departure_time <= now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat changes are allowed only before departure.')
+
+    aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == flight.aircraft_id).first()
+    if not aircraft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Aircraft not found for selected flight.')
+
+    new_seat = payload.new_seat_number.strip().upper()
+    class_zone = _class_seat_numbers(aircraft.total_capacity, aircraft.business_seats, booking.class_type)
+    if new_seat not in class_zone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f'Seat {new_seat} is not in your booking class zone.')
+
+    available = set(_available_class_seats(db, flight.flight_id, class_zone))
+    if new_seat != booking.seat_number and new_seat not in available:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Requested seat is not available.')
+
+    old_seat = booking.seat_number
+    booking.seat_number = new_seat
+    db.commit()
+
+    return BookingChangeResponse(
+        booking_reference=booking.booking_reference,
+        message='Seat updated successfully.',
+        old_flight_id=booking.flight_id,
+        new_flight_id=booking.flight_id,
+        old_seat_number=old_seat,
+        new_seat_number=new_seat,
+        additional_amount=0,
+        updated_total_amount=float(booking.total_amount),
+    )
+
+
+@app.post('/bookings/{pnr}/change-flight', response_model=BookingChangeResponse)
+def change_booking_flight(
+    pnr: str,
+    payload: ChangeFlightRequest,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(require_roles('Passenger', 'Admin')),
+) -> BookingChangeResponse:
+    now = datetime.now()
+    booking = db.query(Booking).filter(Booking.booking_reference == pnr).first()
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Booking not found.')
+
+    if current_user.role == 'Passenger' and booking.passenger_id != current_user.passenger_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='You can only modify your own bookings.')
+
+    if booking.status == 'Cancelled':
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot modify a cancelled booking.')
+
+    old_flight = db.query(Flight).filter(Flight.flight_id == booking.flight_id).first()
+    new_flight = db.query(Flight).filter(Flight.flight_id == payload.new_flight_id).first()
+    if not old_flight or not new_flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Source or target flight not found.')
+
+    if old_flight.departure_time <= now or new_flight.departure_time <= now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Flight changes are allowed only for future flights.')
+
+    old_route = db.query(Route).filter(Route.route_id == old_flight.route_id).first()
+    new_route = db.query(Route).filter(Route.route_id == new_flight.route_id).first()
+    if not old_route or not new_route:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Route details missing for selected flights.')
+
+    if (old_route.origin_code, old_route.dest_code) != (new_route.origin_code, new_route.dest_code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='MVP rebooking supports only same origin-destination route.')
+
+    new_aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == new_flight.aircraft_id).first()
+    if not new_aircraft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Aircraft not found for target flight.')
+
+    class_zone = _class_seat_numbers(new_aircraft.total_capacity, new_aircraft.business_seats, booking.class_type)
+    if booking.class_type in {'Business', 'First'} and not class_zone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f'{booking.class_type} is not available on target flight.')
+
+    available = _available_class_seats(db, new_flight.flight_id, class_zone)
+    requested = payload.new_seat_number.strip().upper() if payload.new_seat_number else None
+
+    if requested:
+        if requested not in class_zone:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f'Seat {requested} is not in your booking class zone.')
+        if requested not in available:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Requested seat is not available on target flight.')
+        new_seat = requested
+    else:
+        if not available:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='No seats available in your booking class on target flight.')
+        new_seat = available[0]
+
+    class_multiplier = _class_fare_multiplier(booking.class_type)
+    old_class_fare = float(old_flight.base_price) * class_multiplier
+    new_class_fare = float(new_flight.base_price) * class_multiplier
+    fare_increase = max(0.0, new_class_fare - old_class_fare)
+    additional_amount = round(fare_increase + REBOOKING_CHANGE_FEE, 2)
+
+    old_flight_id = booking.flight_id
+    old_seat = booking.seat_number
+    booking.flight_id = new_flight.flight_id
+    booking.seat_number = new_seat
+    booking.total_amount = round(float(booking.total_amount) + additional_amount, 2)
+
+    payment = db.query(Payment).filter(Payment.booking_id == booking.booking_id).first()
+    if payment and payment.payment_status in {'Success', 'Pending'}:
+        payment.amount = booking.total_amount
+
+    db.commit()
+
+    return BookingChangeResponse(
+        booking_reference=booking.booking_reference,
+        message='Flight changed successfully.',
+        old_flight_id=old_flight_id,
+        new_flight_id=new_flight.flight_id,
+        old_seat_number=old_seat,
+        new_seat_number=new_seat,
+        additional_amount=additional_amount,
+        updated_total_amount=float(booking.total_amount),
+    )
+
+
 @app.get('/bookings/{pnr}/ticket', response_model=BookingDetailResponse)
 def get_ticket(
     pnr: str,
@@ -781,7 +1192,7 @@ def cancel_booking(
 def admin_create_route(
     payload: AdminCreateRouteRequest,
     db: Session = Depends(get_db),
-    _: AppUser = Depends(require_roles('Admin')),
+    current_user: AppUser = Depends(require_roles('Admin')),
 ) -> AdminMessageResponse:
     origin = db.query(Airport).filter(Airport.airport_code == payload.origin_code.upper()).first()
     destination = db.query(Airport).filter(Airport.airport_code == payload.dest_code.upper()).first()
@@ -795,6 +1206,17 @@ def admin_create_route(
         estimated_duration_minutes=payload.estimated_duration_minutes,
     )
     db.add(route)
+    db.flush()
+    _log_operational_action(
+        db,
+        action_type='CREATE_ROUTE',
+        entity_type='Route',
+        entity_id=str(route.route_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes='Route created from admin console.',
+        metadata={'origin_code': route.origin_code, 'dest_code': route.dest_code},
+    )
     db.commit()
     return AdminMessageResponse(message='Route created successfully.')
 
@@ -803,7 +1225,7 @@ def admin_create_route(
 def admin_create_aircraft(
     payload: AdminCreateAircraftRequest,
     db: Session = Depends(get_db),
-    _: AppUser = Depends(require_roles('Admin')),
+    current_user: AppUser = Depends(require_roles('Admin')),
 ) -> AdminMessageResponse:
     if payload.business_seats + payload.economy_seats > payload.total_capacity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Seat split exceeds total capacity.')
@@ -822,6 +1244,17 @@ def admin_create_aircraft(
         airline_id=payload.airline_id,
     )
     db.add(aircraft)
+    db.flush()
+    _log_operational_action(
+        db,
+        action_type='CREATE_AIRCRAFT',
+        entity_type='Aircraft',
+        entity_id=str(aircraft.aircraft_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes='Aircraft created from admin console.',
+        metadata={'registration_number': aircraft.registration_number, 'airline_id': aircraft.airline_id},
+    )
     db.commit()
     return AdminMessageResponse(message='Aircraft added successfully.')
 
@@ -830,7 +1263,7 @@ def admin_create_aircraft(
 def admin_create_flight(
     payload: AdminCreateFlightRequest,
     db: Session = Depends(get_db),
-    _: AppUser = Depends(require_roles('Admin')),
+    current_user: AppUser = Depends(require_roles('Admin')),
 ) -> AdminMessageResponse:
     route = db.query(Route).filter(Route.route_id == payload.route_id).first()
     if not route:
@@ -854,6 +1287,17 @@ def admin_create_flight(
         available_seats=aircraft.total_capacity,
     )
     db.add(flight)
+    db.flush()
+    _log_operational_action(
+        db,
+        action_type='CREATE_FLIGHT',
+        entity_type='Flight',
+        entity_id=str(flight.flight_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes='Flight created from admin console.',
+        metadata={'flight_number': flight.flight_number, 'route_id': flight.route_id, 'aircraft_id': flight.aircraft_id},
+    )
     db.commit()
     return AdminMessageResponse(message='Flight schedule created successfully.')
 
@@ -863,7 +1307,7 @@ def admin_update_flight(
     flight_id: int,
     payload: AdminUpdateFlightRequest,
     db: Session = Depends(get_db),
-    _: AppUser = Depends(require_roles('Admin')),
+    current_user: AppUser = Depends(require_roles('Admin')),
 ) -> AdminMessageResponse:
     flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
     if not flight:
@@ -881,8 +1325,312 @@ def admin_update_flight(
     if flight.departure_time >= flight.arrival_time:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Departure must be before arrival.')
 
+    _log_operational_action(
+        db,
+        action_type='UPDATE_FLIGHT',
+        entity_type='Flight',
+        entity_id=str(flight.flight_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes='Flight updated from admin console.',
+        metadata={
+            'departure_time': flight.departure_time.isoformat(),
+            'arrival_time': flight.arrival_time.isoformat(),
+            'base_price': float(flight.base_price),
+            'status': flight.status,
+        },
+    )
     db.commit()
     return AdminMessageResponse(message='Flight updated successfully.')
+
+
+def _try_reaccommodate_bookings(
+    db: Session,
+    source_flight: Flight,
+    max_hours_window: int,
+) -> tuple[int, int, int | None]:
+    route = db.query(Route).filter(Route.route_id == source_flight.route_id).first()
+    if not route:
+        return 0, 0, None
+
+    window_end = source_flight.departure_time + timedelta(hours=max_hours_window)
+    candidates = (
+        db.query(Flight)
+        .join(Route, Route.route_id == Flight.route_id)
+        .filter(Flight.flight_id != source_flight.flight_id)
+        .filter(Route.origin_code == route.origin_code)
+        .filter(Route.dest_code == route.dest_code)
+        .filter(Flight.status.in_(['Scheduled', 'Delayed']))
+        .filter(Flight.departure_time >= datetime.now())
+        .filter(Flight.departure_time <= window_end)
+        .order_by(Flight.departure_time.asc())
+        .all()
+    )
+
+    if not candidates:
+        return 0, 0, None
+
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.flight_id == source_flight.flight_id)
+        .filter(Booking.status.in_(['Pending', 'Confirmed']))
+        .all()
+    )
+
+    moved = 0
+    failed = 0
+    target_flight_id: int | None = None
+
+    for booking in bookings:
+        moved_this_booking = False
+        for candidate in candidates:
+            candidate_aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == candidate.aircraft_id).first()
+            if not candidate_aircraft:
+                continue
+
+            class_zone = _class_seat_numbers(candidate_aircraft.total_capacity, candidate_aircraft.business_seats, booking.class_type)
+            available = _available_class_seats(db, candidate.flight_id, class_zone)
+            if not available:
+                continue
+
+            booking.flight_id = candidate.flight_id
+            booking.seat_number = available[0]
+            target_flight_id = candidate.flight_id
+            moved += 1
+            moved_this_booking = True
+            break
+
+        if not moved_this_booking:
+            failed += 1
+
+    return moved, failed, target_flight_id
+
+
+@app.post('/admin/operations/flights/{flight_id}/cancel', response_model=AdminReaccommodateResponse)
+def admin_cancel_flight_with_reaccommodation(
+    flight_id: int,
+    payload: AdminCancelFlightRequest,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(require_roles('Admin')),
+) -> AdminReaccommodateResponse:
+    flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Flight not found.')
+
+    flight.status = 'Cancelled'
+    moved = 0
+    failed = 0
+    target_flight_id: int | None = None
+
+    if payload.auto_reaccommodate:
+        moved, failed, target_flight_id = _try_reaccommodate_bookings(db, flight, payload.max_hours_window)
+
+    _log_operational_action(
+        db,
+        action_type='DISRUPTION_CANCEL_FLIGHT',
+        entity_type='Flight',
+        entity_id=str(flight.flight_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes=payload.reason,
+        metadata={
+            'auto_reaccommodate': payload.auto_reaccommodate,
+            'max_hours_window': payload.max_hours_window,
+            'moved_bookings': moved,
+            'failed_bookings': failed,
+            'target_flight_id': target_flight_id,
+        },
+    )
+    db.commit()
+
+    return AdminReaccommodateResponse(
+        source_flight_id=flight.flight_id,
+        target_flight_id=target_flight_id,
+        moved_bookings=moved,
+        failed_bookings=failed,
+        message='Flight cancelled and disruption workflow completed.',
+    )
+
+
+@app.post('/admin/operations/flights/{flight_id}/retime', response_model=AdminMessageResponse)
+def admin_retime_flight(
+    flight_id: int,
+    payload: AdminRetimeFlightRequest,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(require_roles('Admin')),
+) -> AdminMessageResponse:
+    flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Flight not found.')
+
+    if payload.new_departure_time >= payload.new_arrival_time:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Departure must be before arrival.')
+
+    flight.departure_time = payload.new_departure_time
+    flight.arrival_time = payload.new_arrival_time
+    if flight.status == 'Cancelled':
+        flight.status = 'Scheduled'
+
+    _log_operational_action(
+        db,
+        action_type='DISRUPTION_RETIME_FLIGHT',
+        entity_type='Flight',
+        entity_id=str(flight.flight_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes=payload.reason,
+        metadata={
+            'new_departure_time': payload.new_departure_time.isoformat(),
+            'new_arrival_time': payload.new_arrival_time.isoformat(),
+        },
+    )
+    db.commit()
+    return AdminMessageResponse(message='Flight retimed successfully.')
+
+
+@app.post('/admin/operations/flights/{flight_id}/swap-aircraft', response_model=AdminMessageResponse)
+def admin_swap_aircraft(
+    flight_id: int,
+    payload: AdminSwapAircraftRequest,
+    db: Session = Depends(get_db),
+    current_user: AppUser = Depends(require_roles('Admin')),
+) -> AdminMessageResponse:
+    flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
+    if not flight:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Flight not found.')
+
+    aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == payload.new_aircraft_id).first()
+    if not aircraft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='New aircraft not found.')
+
+    active_bookings = (
+        db.query(func.count(Booking.booking_id))
+        .filter(Booking.flight_id == flight.flight_id)
+        .filter(Booking.status.in_(['Pending', 'Confirmed']))
+        .scalar()
+        or 0
+    )
+    if aircraft.total_capacity < active_bookings:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Selected aircraft does not have enough capacity for active bookings.')
+
+    old_aircraft_id = flight.aircraft_id
+    flight.aircraft_id = aircraft.aircraft_id
+    flight.available_seats = max(0, aircraft.total_capacity - active_bookings)
+
+    _log_operational_action(
+        db,
+        action_type='DISRUPTION_SWAP_AIRCRAFT',
+        entity_type='Flight',
+        entity_id=str(flight.flight_id),
+        actor_user_id=current_user.user_id,
+        action_status='SUCCESS',
+        action_notes=payload.reason,
+        metadata={'old_aircraft_id': old_aircraft_id, 'new_aircraft_id': aircraft.aircraft_id},
+    )
+    db.commit()
+    return AdminMessageResponse(message='Aircraft swapped successfully.')
+
+
+@app.get('/admin/operations/utilization/aircraft', response_model=list[AircraftUtilizationResponse])
+def admin_aircraft_utilization(
+    next_days: int = Query(default=14, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _: AppUser = Depends(require_roles('Admin')),
+) -> list[AircraftUtilizationResponse]:
+    now = datetime.now()
+    until = now + timedelta(days=next_days)
+    rows = (
+        db.query(
+            Aircraft.aircraft_id,
+            Aircraft.registration_number,
+            Aircraft.airline_id,
+            func.count(Flight.flight_id).label('scheduled_flights'),
+            func.coalesce(func.sum(func.timestampdiff(text('MINUTE'), Flight.departure_time, Flight.arrival_time)), 0).label('minutes'),
+        )
+        .join(Flight, Flight.aircraft_id == Aircraft.aircraft_id)
+        .filter(Flight.departure_time >= now)
+        .filter(Flight.departure_time <= until)
+        .group_by(Aircraft.aircraft_id, Aircraft.registration_number, Aircraft.airline_id)
+        .order_by(desc('minutes'))
+        .all()
+    )
+
+    return [
+        AircraftUtilizationResponse(
+            aircraft_id=row.aircraft_id,
+            registration_number=row.registration_number,
+            airline_id=row.airline_id,
+            scheduled_flights=int(row.scheduled_flights or 0),
+            utilization_hours=round((float(row.minutes or 0) / 60.0), 2),
+        )
+        for row in rows
+    ]
+
+
+@app.get('/admin/operations/utilization/crew', response_model=list[CrewUtilizationResponse])
+def admin_crew_utilization(
+    next_days: int = Query(default=14, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _: AppUser = Depends(require_roles('Admin')),
+) -> list[CrewUtilizationResponse]:
+    now = datetime.now()
+    until = now + timedelta(days=next_days)
+    rows = (
+        db.query(
+            Employee.employee_id,
+            Employee.first_name,
+            Employee.last_name,
+            Employee.role,
+            func.count(CrewAssignment.assignment_id).label('assigned_flights'),
+            func.coalesce(func.sum(func.timestampdiff(text('MINUTE'), Flight.departure_time, Flight.arrival_time)), 0).label('minutes'),
+        )
+        .join(CrewAssignment, CrewAssignment.employee_id == Employee.employee_id)
+        .join(Flight, Flight.flight_id == CrewAssignment.flight_id)
+        .filter(Flight.departure_time >= now)
+        .filter(Flight.departure_time <= until)
+        .group_by(Employee.employee_id, Employee.first_name, Employee.last_name, Employee.role)
+        .order_by(desc('minutes'))
+        .all()
+    )
+
+    return [
+        CrewUtilizationResponse(
+            employee_id=row.employee_id,
+            employee_name=f'{row.first_name} {row.last_name}',
+            role=row.role,
+            assigned_flights=int(row.assigned_flights or 0),
+            utilization_hours=round((float(row.minutes or 0) / 60.0), 2),
+        )
+        for row in rows
+    ]
+
+
+@app.get('/admin/operations/audit-logs', response_model=list[AuditLogResponse])
+def admin_audit_logs(
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _: AppUser = Depends(require_roles('Admin')),
+) -> list[AuditLogResponse]:
+    rows = (
+        db.query(OperationalAuditLog)
+        .order_by(OperationalAuditLog.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        AuditLogResponse(
+            audit_id=row.audit_id,
+            action_type=row.action_type,
+            entity_type=row.entity_type,
+            entity_id=row.entity_id,
+            actor_user_id=row.actor_user_id,
+            action_status=row.action_status,
+            action_notes=row.action_notes,
+            metadata_json=row.metadata_json,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
 
 
 @app.get('/admin/flights/{flight_id}/manifest', response_model=list[ManifestEntryResponse])

@@ -186,5 +186,20 @@ CREATE TABLE refund (
     CONSTRAINT chk_refund_amount CHECK (refund_amount >= 0)
 );
 
+CREATE TABLE operational_audit_log (
+    audit_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    action_type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(50) NOT NULL,
+    actor_user_id BIGINT NOT NULL,
+    action_status VARCHAR(20) NOT NULL,
+    action_notes VARCHAR(255),
+    metadata_json VARCHAR(2000),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_actor_user FOREIGN KEY (actor_user_id) REFERENCES app_user (user_id)
+);
+
 CREATE INDEX idx_airport_city ON airport (city);
 CREATE INDEX idx_route_origin_dest ON route (origin_code, dest_code);
+CREATE INDEX idx_audit_created_at ON operational_audit_log (created_at);
+CREATE INDEX idx_audit_entity ON operational_audit_log (entity_type, entity_id);

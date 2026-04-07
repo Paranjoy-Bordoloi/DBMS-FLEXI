@@ -40,6 +40,9 @@ class FlightSearchResponse(BaseModel):
     arrival_time: datetime
     duration_minutes: int
     price: float
+    economy_price: float
+    business_price: float
+    first_price: float
     available_seats: int
     status: str
 
@@ -121,6 +124,43 @@ class CancelBookingResponse(BaseModel):
     refund_status: str
 
 
+class ChangeFlightRequest(BaseModel):
+    new_flight_id: int = Field(ge=1)
+    new_seat_number: str | None = Field(default=None, min_length=1, max_length=5)
+
+
+class ChangeSeatRequest(BaseModel):
+    new_seat_number: str = Field(min_length=1, max_length=5)
+
+
+class BookingChangeResponse(BaseModel):
+    booking_reference: str
+    message: str
+    old_flight_id: int | None = None
+    new_flight_id: int | None = None
+    old_seat_number: str | None = None
+    new_seat_number: str | None = None
+    additional_amount: float = 0
+    updated_total_amount: float
+
+
+class SeatMapSeatResponse(BaseModel):
+    seat_number: str
+    cabin_class: str
+    seat_type: str
+    status: str
+    is_selectable: bool
+
+
+class SeatMapResponse(BaseModel):
+    flight_id: int
+    aircraft_id: int
+    total_capacity: int
+    business_seats: int
+    economy_seats: int
+    seats: list[SeatMapSeatResponse]
+
+
 class AdminCreateRouteRequest(BaseModel):
     origin_code: str = Field(min_length=3, max_length=3)
     dest_code: str = Field(min_length=3, max_length=3)
@@ -152,6 +192,59 @@ class AdminUpdateFlightRequest(BaseModel):
     arrival_time: datetime | None = None
     base_price: float | None = Field(default=None, ge=0)
     status: str | None = Field(default=None, pattern='^(Scheduled|Delayed|Cancelled|Departed)$')
+
+
+class AdminCancelFlightRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=255)
+    auto_reaccommodate: bool = True
+    max_hours_window: int = Field(default=24, ge=1, le=72)
+
+
+class AdminRetimeFlightRequest(BaseModel):
+    new_departure_time: datetime
+    new_arrival_time: datetime
+    reason: str = Field(min_length=3, max_length=255)
+
+
+class AdminSwapAircraftRequest(BaseModel):
+    new_aircraft_id: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+class AdminReaccommodateResponse(BaseModel):
+    source_flight_id: int
+    target_flight_id: int | None
+    moved_bookings: int
+    failed_bookings: int
+    message: str
+
+
+class AircraftUtilizationResponse(BaseModel):
+    aircraft_id: int
+    registration_number: str
+    airline_id: int
+    scheduled_flights: int
+    utilization_hours: float
+
+
+class CrewUtilizationResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    role: str
+    assigned_flights: int
+    utilization_hours: float
+
+
+class AuditLogResponse(BaseModel):
+    audit_id: int
+    action_type: str
+    entity_type: str
+    entity_id: str
+    actor_user_id: int
+    action_status: str
+    action_notes: str | None
+    metadata_json: str | None
+    created_at: datetime
 
 
 class AdminMessageResponse(BaseModel):
