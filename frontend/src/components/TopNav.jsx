@@ -1,8 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 const links = [
-  { to: '/search', label: 'Search Flights' },
-  { to: '/book', label: 'Book Ticket' },
+  { to: '/search', label: 'Book Flight' },
   { to: '/manage', label: 'Manage Booking' },
 ]
 

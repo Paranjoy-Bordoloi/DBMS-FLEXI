@@ -1,0 +1,44 @@
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Contextual Overview of Aviation Data Management}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Evolution from Manual to Digital Frameworks}{3}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Project Scope and Objectives}{3}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Problem Statement}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}The Crisis of Legacy and Manual Systems}{5}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Specific Operational Pain Points}{5}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}The Imperative for a Relational Solution}{6}{subsection.2.3}%
+\contentsline {section}{\numberline {3}System Architecture and Modules}{7}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Architectural Framework}{7}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Functional Module Breakdown}{7}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}User Registration and Management Module}{7}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {3.2.2}Flight Search and Inquiry Module}{8}{subsubsection.3.2.2}%
+\contentsline {subsubsection}{\numberline {3.2.3}Booking and Reservation Module}{8}{subsubsection.3.2.3}%
+\contentsline {subsubsection}{\numberline {3.2.4}Payment and Transaction Module}{8}{subsubsection.3.2.4}%
+\contentsline {subsubsection}{\numberline {3.2.5}Administrator and Flight Management Module}{8}{subsubsection.3.2.5}%
+\contentsline {subsubsection}{\numberline {3.2.6}Cancellation and Notification Module}{9}{subsubsection.3.2.6}%
+\contentsline {section}{\numberline {4}Functional Requirements}{10}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Passenger Functional Requirements}{10}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Administrator Functional Requirements}{11}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}System/Non-Functional Requirements Impacting Database Design}{11}{subsection.4.3}%
+\contentsline {section}{\numberline {5}Entities, Attributes, and Relationships}{12}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Entity Identification and Attribute Definition}{12}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Relationship Analysis and Cardinalities}{14}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Relationship Analysis Table}{15}{subsection.5.3}%
+\contentsline {section}{\numberline {6}Conceptual Design: ER and EER Diagrams}{16}{section.6}%
+\contentsline {subsection}{\numberline {6.1}ER Diagram Components}{16}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Enhanced Entity-Relationship (EER) Modeling}{17}{subsection.6.2}%
+\contentsline {subsubsection}{\numberline {6.2.1}Person Generalization}{18}{subsubsection.6.2.1}%
+\contentsline {subsubsection}{\numberline {6.2.2}Employee Specialization}{19}{subsubsection.6.2.2}%
+\contentsline {subsubsection}{\numberline {6.2.3}Travel Class Specialization}{19}{subsubsection.6.2.3}%
+\contentsline {section}{\numberline {7}Relational Schema}{20}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Table Definitions}{20}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Integrity Constraints}{22}{subsection.7.2}%
+\contentsline {section}{\numberline {8}Functional Dependencies and Anomalies}{23}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Functional Dependencies Identification}{23}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Anomaly Analysis}{23}{subsection.8.2}%
+\contentsline {section}{\numberline {9}Application of Codd's Rules}{25}{section.9}%
+\contentsline {section}{\numberline {10}Normalization}{27}{section.10}%
+\contentsline {subsection}{\numberline {10.1}First Normal Form (1NF)}{27}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Second Normal Form (2NF)}{27}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Third Normal Form (3NF)}{27}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Boyce-Codd Normal Form (BCNF)}{27}{subsection.10.4}%
+\contentsline {section}{\numberline {11}Conclusion}{28}{section.11}%

@@ -1,0 +1,838 @@
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Database Management Systems Lab
+Project Phase: 2
+
+Group Members:
+Sr.No.
+
+Name
+
+PRN
+
+Branch
+
+Division
+
+1
+
+Mihir Hebalkar
+
+22070122120
+
+CS
+
+B2
+
+2
+
+Sachin Mhetre
+
+22070122119
+
+CS
+
+B2
+
+3
+
+Parimal Kulkarni
+
+22070122138
+
+CS
+
+B2
+
+4
+
+Onkar Mendhapurkar
+
+22070122135
+
+CS
+
+B2
+
+Under the Guidance of
+Dr. Pooja Bagane
+
+Department of Computer Science
+Symbiosis Institute of Technology, Pune
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Title of the project:
+Personal Finance Management System
+About the project:
+
+The Personal Finance Management System (PFMS) is a sophisticated application designed to
+empower users in managing their finances with precision and ease. Developed using Java Swing for
+the user interface and MySQL for robust database management, PFMS offers a comprehensive suite
+of features tailored to financial tracking and analysis. Through PFMS, users can register and create
+multiple accounts, each meticulously categorized to represent different financial aspects such as
+savings, checking, and investments. Income and expenses can be recorded seamlessly, with detailed
+information including dates, sources, categories, and amounts, ensuring a granular understanding of
+financial activities.
+Furthermore, PFMS facilitates effective budgeting and goal setting by allowing users to establish
+budgets for various expense categories and define target amounts to achieve specific financial
+milestones. The system's architecture prioritizes data integrity and security, employing foreign key
+constraints and triggers to maintain consistency within the database while ensuring that only
+authorized users can access and modify financial data. Additionally, PFMS offers visualization tools
+such as charts to analyze monthly financial data, empowering users to make informed decisions and
+gain insights into their financial habits and trends. With its scalable and flexible design, PFMS stands
+as a reliable companion for individuals seeking to take control of their financial well-being.
+
+Addressed paint points:
+The pain point addressed by the Personal Finance Management System (PFMS) lies in the complexity and
+disorganization inherent in manual financial tracking. Many individuals struggle to manage multiple accounts,
+track various income sources, and categorize expenses efficiently. PFMS offers a solution by providing a
+user-friendly interface and robust database management, streamlining the process of recording and organizing
+financial data. By centralizing income, expenses, and budgets within a structured framework, PFMS eliminates
+the frustration of scattered financial records and enables users to gain clarity and control over their finances
+effectively.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+ER diagram:
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Anomalies:
+A database anomaly is a fault within a database, which can occur because of poor planning or
+when everything is stored in a flat database. These anomalies naturally occur and result in
+data that does not match the real-world the database purports to represent.
+Anomalies occurring in our database:
+1) 1NF: Insert Anomaly: In the Budget table, having multiple category names within a single cell
+(multi-valued attribute CategoryName) violates the first normal form (1NF) > BudgetID=3. This means if
+we want to insert a new budget entry with multiple categories, we need to repeat all other attribute
+values for each category, leading to redundant data.
+Update Anomaly: Updating a category name for a specific BudgetID would require updating multiple
+rows if the BudgetID has multiple categories associated with it, leading to inconsistencies.
+Delete Anomaly: Deleting a specific category associated with a BudgetID would lead to loss of
+information about other categories if they are stored within the same cell, potentially breaking the
+budget entry.
+
+2) 2NF: Insert Anomaly: To insert a new user, we must provide all attributes including UserID, which may
+not always be available or relevant at the time of insertion.
+Update Anomaly: Updating information about a user requires updating potentially multiple rows if the
+user has multiple accounts, leading to inconsistency.
+Delete Anomaly: Deleting a user might result in losing information about the associated accounts,
+leading to data inconsistency.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+3) 3NF: Insert Anomaly: Inserting a new expense entry requires providing both CategoryID and
+CategoryName, leading to potential data redundancy and inconsistency.
+Update Anomaly: Updating a category's name or description would require updating potentially multiple
+rows if the category is associated with multiple expenses, leading to inconsistency.
+Delete Anomaly: Deleting a category might result in losing information about expenses associated with
+that category, leading to data inconsistency.
+
+Functional dependencies:
+Functional dependency refers to a relationship that is present between attributes of any table
+that are dependent on each other. It helps in avoiding data redundancy and getting to know
+more about bad designs.
+Functional dependencies of schema occurring in our code:
+1. Users Table:
+- UserID -> Username, Fname, Lname, Email
+- Username -> UserID
+- Email -> UserID
+2. PhoneNo Table:
+- UserID -> PhoneNo
+3. Account Table:
+- AccountID -> AccountType, Balance, AccountNumber, Password, UserID
+- UserID -> AccountID
+4. Owns Table:
+- (UserID, AccountID) -> UserID, AccountID
+5. Budget Table:
+- BudgetID -> BudgetName, TotalAmount, StartDate, EndDate, AccountID, BudgetCategoryID
+- AccountID -> BudgetID
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+- BudgetCategoryID -> BudgetID
+6. Budget_Category Table:
+- CategoryID -> CategoryName
+7. Records Table:
+- RecordID -> AccountID
+8. Search_Request Table:
+- RequestID -> SearchText, SearchDate, SearchResults, AccountID, RecordID
+9. Expenses Table:
+- (RecordID, ExpenseID) -> Amount, Date, Description, CategoryID
+10. Income Table:
+- (RecordID, IncomeID) -> Amount, Date, Description, CategoryID
+11. Category Table:
+- CategoryID -> CategoryName
+Normalization:
+A normalization procedure, which combines and splits tables, is usually sufficient to remove
+this. By normalizing the database, we reduce the likelihood of creating tables that
+generate anomalies. Normalization is necessary if you do not do it then the overall integrity
+of the data stored in the database will eventually degrade. Specifically, this is due to data
+anomalies.
+Types of normalization
+1. Unnormalized form or UNF:
+It is the simplest database model also known as non-first normal form (NF2).A UNF
+model will suffer problems like data redundancy thus it lacks the efficiency of
+database normalization.
+2. First Normal Form or 1NF:
+A relation is in first normal form only if the relational table doesn’t contain any
+multivalued attribute but contains only single-valued attributes.
+3. Second Normal Form or 2NF:
+A relation is in second normal form if:
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+• It is in first normal form or 1NF
+• It doesn’t contain any partial dependencies. (It shouldn’t have any non-prime
+attribute which is functionally dependent on any proper subset of the candidate key of
+the relation.).
+4. Third Normal Form or 3NF:
+Let R be the relational schema, X->Y any non-trivial functional dependency over R is
+in 3NF if:
+• R should be in 2NF
+• X should be candidate key or superkey, or
+• Y should be prime attribute
+
+Normalization occurring in our code:
+1) 1NF: In the unnormalized version of the Budget table, the presence of the multi-valued attribute
+CategoryName violates the first normal form (1NF) by allowing multiple values within a single cell. To
+adhere to 1NF, we create a separate table, Budget_Category, to store individual category names. This
+normalization ensures each attribute in the Budget table holds atomic values, promoting data integrity
+and efficient querying.
+
+Creating a separate table for Budget_Category.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+2) 2NF: The attributes Fname, Lname, Username, and Email are functionally dependent only on UserID,
+but not on the entire primary key (which includes AccountID). They describe the user associated with
+the account, not the account itself. This is a partial dependency because these attributes depend on
+part of the primary key.
+
+To remove partial dependency and achieve 2NF, we need to separate user-related attributes into a
+separate table.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+3) 3NF: The attributes CategoryName and CategoryDescription are functionally dependent on
+CategoryID, but they are indirectly dependent on the primary key through RecordID. These attributes
+describe the category associated with the expense, which is determined by CategoryID, not RecordID.
+Therefore, it's a transitive dependency because it depends indirectly on the primary key through
+another non-key attribute.
+
+To remove the transitive dependency and achieve 3NF, we need to separate the attributes related to
+categories into a separate table.
+
+What is MySQL:
+MySQL is a relational database management system (RDBMS) developed by Oracle that is
+based on structured query language (SQL).
+Implementation of the tables in MySQL:
+create database dbmsReport;
+use dbmsReport;
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+CREATE TABLE User (
+UserID INT PRIMARY KEY,
+Fname VARCHAR(20),
+Lname VARCHAR(20),
+Username VARCHAR(50),
+Email VARCHAR(100)
+);
+
+CREATE TABLE PhoneNo (
+UserID INT,
+PhoneNo VARCHAR(12),
+FOREIGN KEY (UserID) REFERENCES User(UserID)
+);
+CREATE TABLE Account (
+AccountID INT PRIMARY KEY,
+AccountType VARCHAR(50),
+Balance DECIMAL(10,2),
+AccountNumber VARCHAR(20),
+Password VARCHAR(50),
+UserID INT,
+FOREIGN KEY (UserID) REFERENCES User(UserID)
+);
+CREATE TABLE Owns (
+UserID INT,
+AccountID INT,
+FOREIGN KEY (UserID) REFERENCES User(UserID),
+FOREIGN KEY (AccountID) REFERENCES Account(AccountID)
+);
+CREATE TABLE Budget (
+BudgetID INT PRIMARY KEY,
+BudgetName VARCHAR(100),
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+TotalAmount DECIMAL(10,2),
+StartDate DATE,
+EndDate DATE,
+AccountID INT,
+BudgetCategoryID INT,
+FOREIGN KEY (AccountID) REFERENCES Account(AccountID)
+);
+CREATE TABLE Budget_Category (
+CategoryID INT PRIMARY KEY,
+CategoryName VARCHAR(100)
+);
+CREATE TABLE Records (
+RecordID INT PRIMARY KEY,
+AccountID INT,
+FOREIGN KEY (AccountID) REFERENCES Account(AccountID)
+);
+CREATE TABLE Search_Request (
+RequestID INT PRIMARY KEY,
+SearchText VARCHAR(100),
+SearchDate DATE,
+SearchResults INT,
+AccountID INT,
+RecordID INT,
+FOREIGN KEY (AccountID) REFERENCES Account(AccountID),
+FOREIGN KEY (RecordID) REFERENCES Records(RecordID)
+);
+CREATE TABLE Category (
+CategoryID INT PRIMARY KEY,
+CategoryName VARCHAR(100)
+);
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+CREATE TABLE Expenses (
+RecordID INT,
+ExpenseID INT,
+Amount DECIMAL(10,2),
+Date DATE,
+Description VARCHAR(100),
+CategoryID INT,
+FOREIGN KEY (RecordID) REFERENCES Records(RecordID),
+FOREIGN KEY (CategoryID) REFERENCES Category(CategoryID)
+);
+CREATE TABLE Income (
+RecordID INT,
+IncomeID INT,
+Amount DECIMAL(10,2),
+Date DATE,
+Description VARCHAR(100),
+CategoryID INT,
+FOREIGN KEY (RecordID) REFERENCES Records(RecordID),
+FOREIGN KEY (CategoryID) REFERENCES Category(CategoryID)
+);
+delimiter //
+create trigger afterincomeinsert
+after insert
+on Income
+for each row
+begin
+declare newbalance DECIMAL(10,2);
+declare updateid INT;
+SET updateid = (SELECT accountid FROM records WHERE recordid = NEW.recordid);
+SET newbalance = (SELECT balance + NEW.amount FROM account WHERE accountid =
+updateid);
+update account SET balance = newbalance WHERE accountid = updateid;
+end;
+//
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+delimiter ;
+delimiter //
+create trigger afterExpenseinsert
+after insert
+on Expenses
+for each row
+begin
+declare newbalance DECIMAL(10,2);
+declare updateid INT;
+SET updateid = (SELECT accountid FROM records WHERE recordid = NEW.recordid);
+SET newbalance = (SELECT balance - NEW.amount FROM account WHERE accountid =
+updateid);
+update account SET balance = newbalance WHERE accountid = updateid;
+end;
+//
+delimiter ;
+
+delimiter //
+create procedure showAccountDetails (
+IN in_username varchar(50)
+)
+begin
+select u.Username,a.accountnumber, a.accountid, a.accounttype, a.balance
+from Account a
+join User u on a.UserID = u.UserID
+where u.Username = in_username;
+end;
+//
+delimiter ;
+
+delimiter //
+create procedure changePassword (
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+in_username varchar(50),
+in_password varchar(50),
+new_password varchar(50)
+)
+begin
+declare existing_pass varchar(50);
+select password into existing_pass from account where userid = (
+select userid from user where username = in_username
+);
+if existing_pass is not null and existing_pass = in_password then
+UPDATE Account SET password = new_password where userid = (
+select userid from user where username = in_username
+);
+end if;
+end;
+//
+delimiter ;
+call changePassword('johndoe','password1','newpassword');
+delimiter //
+create function currentBal(in_username varchar(50))
+returns decimal(10,2)
+reads sql data
+begin
+declare cur_bal decimal(10,2);
+select sum(i.amount) - sum(e.amount) into cur_bal
+from account a
+join records r on a.accountid = r.accountid
+join income i on r.recordid = i.recordid
+join expenses e on r.recordid = e.recordid
+join user u on u.userid = a.userid
+where u.username = in_username;
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+return cur_bal;
+end;
+//
+delimiter ;
+select currentBal('johndoe') "Balance";
+delimiter //
+create function expenseForCategory(in_category varchar(20))
+returns decimal(10,2)
+reads sql data
+begin
+declare totalExpense decimal(10,2);
+select sum(amount) into totalExpense from expenses
+where categoryid = (select CategoryID from Category where CategoryName =
+in_category);
+return totalExpense;
+end;
+//
+delimiter ;
+select expenseForCategory('Food') as FoodExpense;
+INSERT INTO User (UserID, Fname, Lname, Username, Email)
+VALUES (1, 'John', 'Doe', 'johndoe', 'john.doe@example.com'),
+(2, 'Jane', 'Smith', 'janesmith', 'jane.smith@example.com'),
+(3, 'Michael', 'Johnson', 'michaeljohnson', 'michael.johnson@example.com'),
+(4, 'Emily', 'Brown', 'emilybrown', 'emily.brown@example.com'),
+(5, 'William', 'Martinez', 'williammartinez', 'william.martinez@example.com'),
+(6, 'Olivia', 'Taylor', 'oliviataylor', 'olivia.taylor@example.com'),
+(7, 'James', 'Anderson', 'jamesanderson', 'james.anderson@example.com'),
+(8, 'Sophia', 'Thomas', 'sophiathomas', 'sophia.thomas@example.com'),
+(9, 'David', 'Hernandez', 'davidhernandez', 'david.hernandez@example.com'),
+(10, 'Emma', 'Garcia', 'emmagarcia', 'emma.garcia@example.com');
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+INSERT INTO PhoneNo (UserID, PhoneNo)
+VALUES (1, '9315462104'),
+(2, '9876543210'),
+(3, '7152467904'),
+(4, '9845064805'),
+(5, '8094505456'),
+(6, '8894770245'),
+(7, '9171819202'),
+(8, '7222324252'),
+(9, '8272829301'),
+(10, '7732333536');
+
+INSERT INTO Account (AccountID, AccountType, Balance, AccountNumber, Password, UserID)
+VALUES (1, 'Savings', 1000.00, '101', 'password1', 1),
+(2, 'Checking', 500.00, '102', 'password2', 2),
+(3, 'Savings', 1500.00, '135', 'password3', 3),
+(4, 'Checking', 200.00, '105', 'password4', 4),
+(5, 'Savings', 800.00, '108', 'password5', 5),
+(6, 'Checking', 700.00, '117', 'password6', 6),
+(7, 'Savings', 1200.00, '118', 'password7', 7),
+(8, 'Checking', 300.00, '109', 'password8', 8),
+(9, 'Savings', 2000.00, '120', 'password9', 9),
+(10, 'Checking', 400.00, '138', 'password10', 10);
+INSERT INTO Owns (UserID, AccountID)
+VALUES (1, 1),
+(2, 2),
+(3, 3),
+(4, 4),
+(5, 5),
+(6, 6),
+(7, 7),
+(8, 8),
+(9, 9),
+(10, 10);
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+INSERT INTO Budget_Category (CategoryID, CategoryName)
+VALUES (1, 'Groceries'),
+(2, 'Entertainment'),
+(3, 'Utilities'),
+(4, 'Transportation'),
+(5, 'Education'),
+(6, 'Healthcare'),
+(7, 'Travel'),
+(8, 'Clothing'),
+(9, 'Dining Out'),
+(10, 'Gifts');
+
+INSERT INTO Records (RecordID, AccountID)
+VALUES (1, 1),
+(2, 2),
+(3, 3),
+(4, 4),
+(5, 5),
+(6, 6),
+(7, 7),
+(8, 8),
+(9, 9),
+(10, 10);
+
+INSERT INTO Category (CategoryID, CategoryName)
+VALUES (1, 'Food'),
+(2, 'Salary'),
+(3, 'Rent'),
+(4, 'Utilities'),
+(5, 'Transportation'),
+(6, 'Education'),
+(7, 'Healthcare'),
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+(8, 'Travel'),
+(9, 'Clothing'),
+(10, 'Entertainment');
+
+INSERT INTO Expenses (RecordID, ExpenseID, Amount, Date, Description, CategoryID)
+VALUES (1, 1, 50.00, '2024-01-05', 'Groceries', 1),
+(2, 2, 200.00, '2024-01-15', 'Dinner with friends', 10),
+(3, 3, 100.00, '2024-01-10', 'Electricity bill', 4),
+(4, 4, 30.00, '2024-01-20', 'Bus fare', 5),
+(5, 5, 50.00, '2024-01-25', 'Books', 6),
+(6, 6, 80.00, '2024-01-08', 'Doctor visit', 7),
+(7, 7, 200.00, '2024-01-14', 'Flight tickets', 8),
+(8, 8, 60.00, '2024-01-16', 'T-shirts', 9),
+(9, 9, 70.00, '2024-01-18', 'Movie tickets', 10),
+(10, 10, 40.00, '2024-01-30', 'Gift for friend', 10);
+
+INSERT INTO Income (RecordID, IncomeID, Amount, Date, Description, CategoryID)
+VALUES (1, 1, 2000.00, '2024-01-10', 'Monthly salary', 2),
+(2, 2, 500.00, '2024-01-20', 'Freelance work', 2),
+(3, 3, 1500.00, '2024-01-05', 'Rent payment', 3),
+(4, 4, 300.00, '2024-01-15', 'Utility refund', 4),
+(5, 5, 1000.00, '2024-01-25', 'Transportation reimbursement', 5),
+(6, 6, 800.00, '2024-01-08', 'Scholarship', 6),
+(7, 7, 500.00, '2024-01-14', 'Insurance claim', 7),
+(8, 8, 700.00, '2024-01-16', 'Travel allowance', 8),
+(9, 9, 400.00, '2024-01-18', 'Clothing allowance', 9),
+(10, 10, 300.00, '2024-01-30', 'Gift from family', 10);
+INSERT INTO Budget (BudgetID, BudgetName, TotalAmount, StartDate, EndDate, AccountID,
+BudgetCategoryID)
+VALUES
+(1, 'Monthly Expenses', 1500.00, '2024-04-01', '2024-04-30', 1, 1),
+(2, 'Entertainment', 200.00, '2024-04-01', '2024-04-30', 1, 2),
+(3, 'Utilities', 300.00, '2024-04-01', '2024-04-30', 2, 3),
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+(4, 'Transportation', 100.00, '2024-04-01', '2024-04-30', 2, 4),
+(5, 'Education', 500.00, '2024-04-01', '2024-04-30', 3, 5);
+
+INSERT INTO Search_Request (RequestID, SearchText, SearchDate, SearchResults,
+AccountID, RecordID)
+VALUES (1, 'Groceries', '2024-04-26', 5, 1, 1);
+
+Table outputs:
+1. User
+
+2. Phone
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+3. Account
+
+4. Owns
+
+5. Budget
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+6. Budget Category
+
+7. Records
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+8. Search Request
+
+9. Category
+
+10. Expense
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+11. Income
+
+Queries implemented:
+Query 1: To display account information with balance.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Query 2: To display total expense of user category-wise.
+
+Query 3: To display current balance of the user.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Query 4: To show total budget allocated by user category-wise.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Query 5: To display month wise income and expense comparison for every account.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Function:
+A function is a set of SQL statements, that you can pass parameters into, and they perform
+some operation and return a single value.
+Functions:
+1. Function to get current Balance of a user.
+
+Query -> select currentBal('johndoe') "Balance";
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+2. Function to get total Expense of a certain category.
+
+Query -> select expenseForCategory('Food') as FoodExpense;
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Stored Procedure:
+A stored procedure is a set of pre-compiled Structured Query Languages (SQL), so it can be
+reused and shared by multiple programs. It can access or modify data in a database.
+Procedure:
+1. Procedure to show Account Details
+
+Query -> call showAccountDetails('johndoe');
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+2. Procedure to change Password of User
+
+Query -> call changePassword('johndoe','password1','newpassword');
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+Trigger:
+A trigger is also a set of SQL statements in the database which automatically execute
+whenever any special event occurs in the database, like insert, delete, update, etc.
+
+Triggers:
+1. Trigger to update Balance in Accounts table after inserting new Income to maintain Consistency in
+database.
+
+Query -> insert into income values(11, 11, 400, '2024-05-16', 'Gift from family', 10);
+
+Balance updated in account table.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+2. Trigger to update Balance in Accounts table after inserting new Expense to maintain Consistency in
+database.
+
+Query -> insert into expenses values(12,11,100, '2024-02-25', 'Groceries',1);
+
+Balance updated in account table.
+
+SYMBIOSIS INTERNATIONAL (DEEMED UNIVERSITY)
+(Established under section 3 of the UGC Act 1956)
+Re - accredited by NAAC with ‘A’ Grade
+Founder: Prof. Dr. S. B. Mujumdar, M.Sc.,Ph.D. (Awarded Padma Bhushan and Padma Shri
+by President of India)
+______________________________________________________________________
+
+References:
+Tools Used:
+1. MySQL :: Download MySQL Workbench
+2. Flowchart Maker & Online Diagram Software (Draw.io)
+3. canva.com
+Research:
+1. Software Architecture of Online Personal Finance Management System | Maharaj's Memoirs Academia.edu
+2. (PDF) DESIGN AND DEVELOPMENT OF PERSONAL FINANCE MANAGEMENT SYSTEM
+(researchgate.net)
+3. Database Design in DBMS - GeeksforGeeks
+
+

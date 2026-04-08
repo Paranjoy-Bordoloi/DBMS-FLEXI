@@ -1,3 +1,8 @@
 com\ars\admin\db\Database.class
+com\ars\admin\service\DashboardMetricsService.class
+com\ars\admin\cli\AirlineCliApp$ApiResponse.class
 com\ars\admin\servlet\DashboardServlet.class
+com\ars\admin\cli\AirlineCliApp.class
 com\ars\admin\servlet\HealthServlet.class
+com\ars\admin\service\DashboardMetricsService$DashboardSummary.class
+com\ars\admin\service\DashboardMetricsServiceImpl.class

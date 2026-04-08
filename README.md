@@ -222,6 +222,43 @@ Useful options:
 - `--dry-run`: preview inserts without writing to database
 - `--max-flights 100`: process only first N future flights instead of `--all-flights`
 
+## Interactive CLI (No Frontend)
+
+You can operate the system without the React frontend using the interactive CLI console:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\cli_console.py
+```
+
+Optional base URL override:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\cli_console.py --base-url http://127.0.0.1:8000
+```
+
+Java CLI (with strong input validation and descriptive type/input errors):
+
+```powershell
+cd admin-java
+mvn -q -DskipTests exec:java "-Dexec.mainClass=com.ars.admin.cli.AirlineCliApp"
+```
+
+Optional Java CLI base URL override:
+
+```powershell
+cd admin-java
+mvn -q -DskipTests exec:java "-Dexec.mainClass=com.ars.admin.cli.AirlineCliApp" "-Dexec.args=--base-url http://127.0.0.1:8000"
+```
+
+CLI capabilities:
+- Login or register
+- Search flights and select one to book
+- List current bookings
+- Retrieve booking by PNR
+- Cancel booking
+- Change seat / change flight
+- Admin booking explorer with filters (`status`, `flight_id`, `passenger_id`, `passenger_email`, `limit`)
+
 ### Admin Booking List API
 
 Admin users can view **all bookings by all passengers** via the `/admin/bookings` endpoint with powerful filtering:
