@@ -31,6 +31,7 @@ from .models import (
 )
 from .schemas import (
     AdminCancelFlightRequest,
+    AdminBookingExplorerResponse,
     AdminCreateAircraftRequest,
     AdminCreateFlightRequest,
     AdminCreateRouteRequest,
@@ -383,6 +384,8 @@ def search_flights(
     departure_to_hour: int | None = Query(default=None, ge=0, le=23),
     db: Session = Depends(get_db),
 ) -> list[FlightSearchResponse]:
+    now = datetime.now()
+
     try:
         date_value = datetime.strptime(travel_date, '%Y-%m-%d').date()
     except ValueError as error:
@@ -414,6 +417,7 @@ def search_flights(
         .filter(Route.dest_code == destination_code.upper())
         .filter(Flight.departure_time >= day_start)
         .filter(Flight.departure_time <= day_end)
+        .filter(Flight.departure_time > now)
         .filter(Flight.status.in_(['Scheduled', 'Delayed']))
     )
 
@@ -568,6 +572,10 @@ def create_booking(
     if not flight:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Flight not found.')
 
+    aircraft = db.query(Aircraft).filter(Aircraft.aircraft_id == flight.aircraft_id).first()
+    if not aircraft:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Aircraft not found for selected flight.')
+
     if flight.departure_time <= now:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot book a departed flight.')
 
@@ -682,6 +690,7 @@ def create_booking(
     return CreateBookingResponse(
         booking_reference=booking.booking_reference,
         booking_id=booking.booking_id,
+        seat_number=booking.seat_number,
         status=booking.status,
         total_amount=float(booking.total_amount),
     )
@@ -780,7 +789,7 @@ def list_current_bookings(
     ]
 
 
-@app.get('/admin/bookings', response_model=list[BookingDetailResponse])
+@app.get('/admin/bookings', response_model=list[AdminBookingExplorerResponse])
 def admin_list_all_bookings(
     status: str | None = Query(default=None, pattern='^(Pending|Confirmed|Cancelled)$'),
     flight_id: int | None = Query(default=None),
@@ -789,7 +798,7 @@ def admin_list_all_bookings(
     limit: int = Query(default=500, ge=1, le=5000),
     db: Session = Depends(get_db),
     _: AppUser = Depends(require_roles('Admin')),
-) -> list[BookingDetailResponse]:
+) -> list[AdminBookingExplorerResponse]:
     """List all bookings across all passengers (admin only).
     
     Filters:
@@ -835,7 +844,7 @@ def admin_list_all_bookings(
     rows = query.limit(limit).all()
 
     return [
-        BookingDetailResponse(
+        AdminBookingExplorerResponse(
             booking_id=row.booking_id,
             booking_reference=row.booking_reference,
             passenger_first_name=row.first_name,

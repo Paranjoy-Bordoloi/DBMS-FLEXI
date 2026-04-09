@@ -85,6 +85,7 @@ class CreateBookingRequest(BaseModel):
 class CreateBookingResponse(BaseModel):
     booking_reference: str
     booking_id: int
+    seat_number: str
     status: str
     total_amount: float
 
@@ -110,6 +111,25 @@ class CurrentBookingResponse(BaseModel):
     seat_number: str
     class_type: str
     booking_status: str
+    total_amount: float
+
+
+class AdminBookingExplorerResponse(BaseModel):
+    booking_id: int
+    booking_reference: str
+    passenger_first_name: str
+    passenger_last_name: str
+    passenger_email: str
+    flight_id: int
+    flight_number: str
+    origin_code: str
+    destination_code: str
+    departure_time: datetime
+    arrival_time: datetime
+    seat_number: str
+    class_type: str
+    booking_date: datetime
+    status: str
     total_amount: float
 
 

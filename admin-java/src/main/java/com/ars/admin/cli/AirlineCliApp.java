@@ -7,6 +7,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -16,6 +22,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 
+import com.ars.admin.db.Database;
+import com.ars.admin.service.DashboardMetricsService;
+import com.ars.admin.service.DashboardMetricsServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -32,12 +41,24 @@ import com.google.gson.JsonSyntaxException;
 public final class AirlineCliApp {
     private static final Gson GSON = new Gson();
 
+    // Private HTTP layer fields
     private final Scanner scanner = new Scanner(System.in);
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final DashboardMetricsService dashboardMetricsService = new DashboardMetricsServiceImpl();
 
     private final String baseUrl;
     private String token;
     private JsonObject me;
+
+    // PUBLIC: Database connection fields (accessible to subclasses/external access)
+    public Connection dbConnection;
+    public boolean isDbConnected = false;
+
+    // PROTECTED: Database configuration (for subclass usage)
+    protected String dbHost = "localhost";
+    protected String dbPort = "3306";
+    protected String dbName = "airline_reservation";
+    protected String dbUser = "root";
 
     public AirlineCliApp(String baseUrl) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
@@ -71,6 +92,7 @@ public final class AirlineCliApp {
             }
         }
 
+        closeDbConnection();
         println("Exiting CLI. Goodbye.");
     }
 
@@ -109,11 +131,15 @@ public final class AirlineCliApp {
         println("6) Change flight");
         if ("Admin".equalsIgnoreCase(role)) {
             println("7) Admin booking explorer (filters)");
+            println("8) Dashboard summary (JDBC)");
+            println("9) Standalone DB queries (JDBC)");
+            println("10) Direct SQL executor (Admin)");
+            println("11) Data modifications - INSERT/UPDATE/DELETE (Admin)");
         }
-        println("9) Logout");
+        println("12) Logout");
         println("0) Quit");
 
-        int max = "Admin".equalsIgnoreCase(role) ? 9 : 9;
+        int max = 12;  // Both passenger and admin can logout; admin options checked in switch
         int choice = readIntInRange("Choose an option", 0, max);
 
         switch (choice) {
@@ -130,7 +156,35 @@ public final class AirlineCliApp {
                     println("Option 7 is available only for Admin users.");
                 }
             }
-            case 9 -> logout();
+            case 8 -> {
+                if ("Admin".equalsIgnoreCase(role)) {
+                    viewDashboardSummary();
+                } else {
+                    println("Option 8 is available only for Admin users.");
+                }
+            }
+            case 9 -> {
+                if ("Admin".equalsIgnoreCase(role)) {
+                    standaloneDbQueries();
+                } else {
+                    println("Option 9 is available only for Admin users.");
+                }
+            }
+            case 10 -> {
+                if ("Admin".equalsIgnoreCase(role)) {
+                    executeDirectSQL();
+                } else {
+                    println("Option 10 is available only for Admin users.");
+                }
+            }
+            case 11 -> {
+                if ("Admin".equalsIgnoreCase(role)) {
+                    dataModificationMenu();
+                } else {
+                    println("Option 11 is available only for Admin users.");
+                }
+            }
+            case 12 -> logout();
             case 0 -> {
                 return false;
             }
@@ -196,7 +250,20 @@ public final class AirlineCliApp {
     private void logout() {
         token = null;
         me = null;
+        closeDbConnection();
         println("Logged out.");
+    }
+
+    private void closeDbConnection() {
+        if (isDbConnected && dbConnection != null) {
+            try {
+                dbConnection.close();
+                isDbConnected = false;
+                println("✓ Database connection closed");
+            } catch (SQLException ex) {
+                println("Warning: Error closing database connection: " + ex.getMessage());
+            }
+        }
     }
 
     private void searchAndBook() {
@@ -222,8 +289,8 @@ public final class AirlineCliApp {
             println("No flights found for the given route/date. Try changing airport codes or date.");
             return;
         }
-
         println("\nAvailable flights:");
+
         for (int i = 0; i < flights.size(); i++) {
             JsonObject f = flights.get(i).getAsJsonObject();
             println((i + 1) + ") flight_id=" + getSafe(f, "flight_id") +
@@ -235,14 +302,22 @@ public final class AirlineCliApp {
 
         int selectedIndex = readIntInRange("Select flight number from list", 1, flights.size()) - 1;
         JsonObject selectedFlight = flights.get(selectedIndex).getAsJsonObject();
+        long selectedFlightId = selectedFlight.get("flight_id").getAsLong();
+
+        Map<String, String> classSeatRanges = fetchSeatRangeIndicators(selectedFlightId);
+        printClassSeatRanges(classSeatRanges);
 
         String classType = readClassType("Class type (Economy/Business/First)");
+        String selectedClassRange = classSeatRanges.get(classType);
+        if (selectedClassRange != null) {
+            println("Selected class seat range: " + selectedClassRange);
+        }
         String seat = readOptional("Seat number (optional, e.g., 14C)");
 
         JsonObject payload = new JsonObject();
         payload.addProperty("passenger_id", me.get("passenger_id").getAsLong());
         payload.addProperty("user_id", me.get("user_id").getAsLong());
-        payload.addProperty("flight_id", selectedFlight.get("flight_id").getAsLong());
+        payload.addProperty("flight_id", selectedFlightId);
         if (seat == null || seat.isBlank()) {
             payload.add("seat_number", null);
             payload.addProperty("random_allotment", true);
@@ -417,6 +492,395 @@ public final class AirlineCliApp {
                 " | " + getSafe(b, "passenger_first_name") + " " + getSafe(b, "passenger_last_name") +
                 " | " + getSafe(b, "status"));
         }
+    }
+
+    private void viewDashboardSummary() {
+        try (Connection conn = Database.getConnection()) {
+            DashboardMetricsService.DashboardSummary summary = dashboardMetricsService.fetchSummary(conn);
+            println("\nDashboard summary:");
+            println("Total bookings: " + summary.totalBookings());
+            println("Confirmed bookings: " + summary.confirmedBookings());
+            println("Total revenue: " + formatInr(summary.totalRevenue()));
+            println("Average occupancy (%): " + summary.averageOccupancyPercent());
+        } catch (SQLException ex) {
+            println("Could not load dashboard summary: " + ex.getMessage());
+        }
+    }
+
+    private void standaloneDbQueries() {
+        if (!ensureDbConnection()) return;
+
+        println("\n=== Standalone Database Query Menu ===");
+        println("1) Query bookings by flight");
+        println("2) Query passenger booking history");
+        println("3) Query payment records");
+        println("4) Query flight occupancy");
+        println("5) Query all passengers");
+        println("0) Back to main menu");
+
+        int choice = readIntInRange("Choose query type", 0, 5);
+        switch (choice) {
+            case 1 -> queryBookingsByFlight();
+            case 2 -> queryPassengerHistory();
+            case 3 -> queryPaymentRecords();
+            case 4 -> queryFlightOccupancy();
+            case 5 -> queryAllPassengers();
+            case 0 -> {}
+            default -> println("Unknown option.");
+        }
+    }
+
+    private void queryBookingsByFlight() {
+        try {
+            long flightId = readLong("Enter flight ID", 1, Long.MAX_VALUE);
+            String sql = "SELECT b.booking_reference, p.first_name, p.last_name, b.seat_number, b.class_type, b.status, b.total_amount " +
+                        "FROM booking b JOIN passenger p ON b.passenger_id = p.passenger_id " +
+                        "WHERE b.flight_id = " + flightId + " ORDER BY b.booking_reference";
+            executeAndDisplayQuery(sql, new String[]{"PNR", "First Name", "Last Name", "Seat", "Class", "Status", "Amount"});
+        } catch (Exception ex) {
+            println("Error querying bookings: " + ex.getMessage());
+        }
+    }
+
+    private void queryPassengerHistory() {
+        try {
+            long passengerId = readLong("Enter passenger ID", 1, Long.MAX_VALUE);
+            String sql = "SELECT b.booking_reference, f.flight_number, f.departure_time, b.seat_number, b.class_type, b.status, b.total_amount " +
+                        "FROM booking b JOIN flight f ON b.flight_id = f.flight_id " +
+                        "WHERE b.passenger_id = " + passengerId + " ORDER BY f.departure_time DESC";
+            executeAndDisplayQuery(sql, new String[]{"PNR", "Flight", "Departure", "Seat", "Class", "Status", "Amount"});
+        } catch (Exception ex) {
+            println("Error querying passenger history: " + ex.getMessage());
+        }
+    }
+
+    private void queryPaymentRecords() {
+        try {
+            long limit = readLongWithDefault("Limit results (1-10000)", 1, 10000, 100);
+            String sql = "SELECT p.payment_id, b.booking_reference, p.amount, p.payment_method, p.transaction_date, p.payment_status " +
+                        "FROM payment p JOIN booking b ON p.booking_id = b.booking_id " +
+                        "ORDER BY p.transaction_date DESC LIMIT " + limit;
+            executeAndDisplayQuery(sql, new String[]{"ID", "PNR", "Amount", "Method", "Date", "Status"});
+        } catch (Exception ex) {
+            println("Error querying payments: " + ex.getMessage());
+        }
+    }
+
+    private void queryFlightOccupancy() {
+        try {
+            String sql = "SELECT f.flight_id, f.flight_number, f.departure_time, a.total_capacity, " +
+                        "COUNT(b.booking_id) as booked_seats, " +
+                        "ROUND((COUNT(b.booking_id) * 100.0 / a.total_capacity), 2) as occupancy_percent " +
+                        "FROM flight f JOIN aircraft a ON f.aircraft_id = a.aircraft_id " +
+                        "LEFT JOIN booking b ON f.flight_id = b.flight_id AND b.status IN ('Pending', 'Confirmed') " +
+                        "GROUP BY f.flight_id, f.flight_number, f.departure_time, a.total_capacity " +
+                        "ORDER BY occupancy_percent DESC LIMIT 50";
+            executeAndDisplayQuery(sql, new String[]{"Flight ID", "Number", "Departure", "Capacity", "Booked", "Occupancy %"});
+        } catch (Exception ex) {
+            println("Error querying occupancy: " + ex.getMessage());
+        }
+    }
+
+    private void queryAllPassengers() {
+        try {
+            long limit = readLongWithDefault("Limit results (1-10000)", 1, 10000, 500);
+            String sql = "SELECT p.passenger_id, p.first_name, p.last_name, p.email, p.phone, p.passport_number " +
+                        "FROM passenger p ORDER BY p.passenger_id DESC LIMIT " + limit;
+            executeAndDisplayQuery(sql, new String[]{"ID", "First Name", "Last Name", "Email", "Phone", "Passport"});
+        } catch (Exception ex) {
+            println("Error querying passengers: " + ex.getMessage());
+        }
+    }
+
+    private void executeDirectSQL() {
+        if (!ensureDbConnection()) return;
+
+        String sql = readNonEmpty("Enter SQL query (SELECT only, for safety)");
+        if (!sql.trim().toUpperCase().startsWith("SELECT")) {
+            println("Only SELECT queries are allowed for safety.");
+            return;
+        }
+
+        try {
+            println("\nExecuting query...");
+            Statement stmt = dbConnection.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            int columnCount = rs.getMetaData().getColumnCount();
+
+            // Print header
+            for (int i = 1; i <= columnCount; i++) {
+                System.out.print(rs.getMetaData().getColumnName(i));
+                if (i < columnCount) System.out.print(" | ");
+            }
+            println("");
+            println("-".repeat(80));
+
+            // Print rows
+            int rowCount = 0;
+            while (rs.next() && rowCount < 1000) {
+                for (int i = 1; i <= columnCount; i++) {
+                    Object value = rs.getObject(i);
+                    System.out.print(value != null ? value.toString() : "NULL");
+                    if (i < columnCount) System.out.print(" | ");
+                }
+                println("");
+                rowCount++;
+            }
+            println("\nRows returned: " + rowCount);
+            rs.close();
+            stmt.close();
+        } catch (SQLException ex) {
+            println("Query error: " + ex.getMessage());
+        }
+    }
+
+    private void dataModificationMenu() {
+        if (!ensureDbConnection()) return;
+
+        println("\n=== Data Modification Menu (INSERT/UPDATE/DELETE) ===");
+        println("1) INSERT - Add new passenger (Example 1)");
+        println("2) INSERT - Add new route (Example 2)");
+        println("3) UPDATE - Change booking status (Example 3)");
+        println("4) UPDATE - Update flight base price (Example 4)");
+        println("5) DELETE - Remove expired seat locks (Example 5)");
+        println("0) Back to main menu");
+
+        int choice = readIntInRange("Choose operation type", 0, 5);
+        println("\n⚠️  WARNING: This will modify the database. Ensure you understand the operation.");
+        
+        boolean proceed = readYesNo("Confirm operation?");
+        if (!proceed) {
+            println("Operation cancelled.");
+            return;
+        }
+
+        switch (choice) {
+            case 1 -> insertNewPassenger();
+            case 2 -> insertNewRoute();
+            case 3 -> updateBookingStatus();
+            case 4 -> updateFlightPrice();
+            case 5 -> deleteExpiredSeatLocks();
+            case 0 -> {}
+            default -> println("Unknown option.");
+        }
+    }
+
+    private void insertNewPassenger() {
+        try {
+            String firstName = readName("Passenger first name");
+            String lastName = readName("Passenger last name");
+            String email = readEmail("Email");
+            String phone = readPhone("Phone number");
+            String passport = readPassport("Passport number");
+            String dob = readDate("Date of birth (YYYY-MM-DD)");
+            String address = readNonEmpty("Address");
+
+            String sql = String.format(
+                "INSERT INTO passenger (first_name, last_name, email, phone, passport_number, date_of_birth, address) " +
+                "VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s')",
+                firstName, lastName, email, phone, passport, dob, address
+            );
+
+            Statement stmt = dbConnection.createStatement();
+            int rowsInserted = stmt.executeUpdate(sql);
+            stmt.close();
+
+            if (rowsInserted > 0) {
+                println("\n✅ SUCCESS: Passenger inserted successfully (" + rowsInserted + " row)");
+                println("SQL: " + sql);
+            } else {
+                println("\n❌ FAILED: No rows inserted");
+            }
+        } catch (SQLException ex) {
+            println("Database error: " + ex.getMessage());
+        }
+    }
+
+    private void insertNewRoute() {
+        try {
+            String originCode = readAirportCode("Origin airport code (3 letters)");
+            String destCode = readAirportCode("Destination airport code (3 letters)");
+            int distance = (int) readLong("Distance in km", 100, 20000);
+            int duration = (int) readLong("Estimated duration in minutes", 30, 1440);
+
+            String sql = String.format(
+                "INSERT INTO route (origin_code, dest_code, distance_km, estimated_duration_minutes) " +
+                "VALUES ('%s', '%s', %d, %d)",
+                originCode, destCode, distance, duration
+            );
+
+            Statement stmt = dbConnection.createStatement();
+            int rowsInserted = stmt.executeUpdate(sql);
+            stmt.close();
+
+            if (rowsInserted > 0) {
+                println("\n✅ SUCCESS: Route inserted successfully (" + rowsInserted + " row)");
+                println("SQL: " + sql);
+            } else {
+                println("\n❌ FAILED: No rows inserted");
+            }
+        } catch (SQLException ex) {
+            println("Database error: " + ex.getMessage());
+        }
+    }
+
+    private void updateBookingStatus() {
+        try {
+            String pnr = readPnr("Booking reference (PNR)");
+            println("\nAvailable statuses: Pending, Confirmed, Cancelled");
+            String newStatus = readNonEmpty("New booking status");
+
+            if (!isAllowedStatus(newStatus)) {
+                println("Invalid status. Allowed: Pending, Confirmed, Cancelled");
+                return;
+            }
+
+            String normalizedStatus = normalizeStatus(newStatus);
+            String sql = String.format(
+                "UPDATE booking SET status = '%s' WHERE booking_reference = '%s'",
+                normalizedStatus, pnr
+            );
+
+            Statement stmt = dbConnection.createStatement();
+            int rowsUpdated = stmt.executeUpdate(sql);
+            stmt.close();
+
+            if (rowsUpdated > 0) {
+                println("\n✅ SUCCESS: Booking status updated (" + rowsUpdated + " row)");
+                println("SQL: " + sql);
+            } else {
+                println("\n❌ FAILED: No booking found with PNR: " + pnr);
+            }
+        } catch (SQLException ex) {
+            println("Database error: " + ex.getMessage());
+        }
+    }
+
+    private void updateFlightPrice() {
+        try {
+            long flightId = readLong("Flight ID", 1, Long.MAX_VALUE);
+            double newPrice = Double.parseDouble(readNonEmpty("New base price (e.g., 5000.00)"));
+
+            // Verify flight exists
+            Statement checkStmt = dbConnection.createStatement();
+            ResultSet rs = checkStmt.executeQuery("SELECT flight_id FROM flight WHERE flight_id = " + flightId);
+            
+            if (!rs.next()) {
+                println("❌ Flight not found with ID: " + flightId);
+                rs.close();
+                checkStmt.close();
+                return;
+            }
+            rs.close();
+            checkStmt.close();
+
+            String sql = String.format(
+                "UPDATE flight SET base_price = %.2f WHERE flight_id = %d",
+                newPrice, flightId
+            );
+
+            Statement stmt = dbConnection.createStatement();
+            int rowsUpdated = stmt.executeUpdate(sql);
+            stmt.close();
+
+            if (rowsUpdated > 0) {
+                println("\n✅ SUCCESS: Flight price updated (" + rowsUpdated + " row)");
+                println("SQL: " + sql);
+            } else {
+                println("\n❌ FAILED: Could not update flight");
+            }
+        } catch (SQLException ex) {
+            println("Database error: " + ex.getMessage());
+        } catch (NumberFormatException ex) {
+            println("Invalid price format. Use format: 5000.00");
+        }
+    }
+
+    private void deleteExpiredSeatLocks() {
+        try {
+            String sql = "DELETE FROM seat_lock WHERE expires_at < NOW()";
+
+            println("\nThis will delete all seat locks that have expired.");
+            println("SQL: " + sql);
+
+            Statement stmt = dbConnection.createStatement();
+            int rowsDeleted = stmt.executeUpdate(sql);
+            stmt.close();
+
+            println("\n✅ SUCCESS: Deleted " + rowsDeleted + " expired seat lock(s)");
+        } catch (SQLException ex) {
+            println("Database error: " + ex.getMessage());
+        }
+    }
+
+    private boolean readYesNo(String prompt) {
+        while (true) {
+            String response = readNonEmpty(prompt + " (yes/no)").toLowerCase(Locale.ROOT);
+            if (response.startsWith("y") || response.equals("yes")) {
+                return true;
+            } else if (response.startsWith("n") || response.equals("no")) {
+                return false;
+            } else {
+                println("Please enter 'yes' or 'no'.");
+            }
+        }
+    }
+
+    private void executeAndDisplayQuery(String sql, String[] headers) {
+        try {
+            if (!isDbConnected) {
+                dbConnection = Database.getConnection();
+                isDbConnected = true;
+            }
+            Statement stmt = dbConnection.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+
+            // Print header
+            for (String header : headers) {
+                System.out.print(String.format("%-20s", header));
+            }
+            println("");
+            println("-".repeat(headers.length * 20));
+
+            // Print rows
+            int rowCount = 0;
+            while (rs.next() && rowCount < 500) {
+                for (int i = 1; i <= headers.length; i++) {
+                    Object value = rs.getObject(i);
+                    String displayValue = value != null ? value.toString() : "-";
+                    System.out.print(String.format("%-20s", displayValue.substring(0, Math.min(20, displayValue.length()))));
+                }
+                println("");
+                rowCount++;
+            }
+            println("\nTotal rows: " + rowCount);
+            rs.close();
+            stmt.close();
+        } catch (SQLException ex) {
+            println("Database error: " + ex.getMessage());
+        }
+    }
+
+    private boolean ensureDbConnection() {
+        if (isDbConnected && dbConnection != null) {
+            return true;
+        }
+        try {
+            dbConnection = Database.getConnection();
+            isDbConnected = true;
+            println("✓ Database connected");
+            return true;
+        } catch (SQLException ex) {
+            println("Failed to connect to database: " + ex.getMessage());
+            isDbConnected = false;
+            return false;
+        }
+    }
+
+    private String formatInr(double amount) {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("en", "IN"));
+        DecimalFormat formatter = new DecimalFormat("##,##,##0.00", symbols);
+        return "Rs. " + formatter.format(amount);
     }
 
     private ApiResponse call(String method, String path, JsonObject payload, Map<String, String> query, boolean auth) {
@@ -666,6 +1130,102 @@ public final class AirlineCliApp {
             case "first" -> "First";
             default -> null;
         };
+    }
+
+    private Map<String, String> fetchSeatRangeIndicators(long flightId) {
+        ApiResponse seatMapResponse = call("GET", "/flights/" + flightId + "/seat-map", null, null, true);
+        if (!seatMapResponse.success()) {
+            return Map.of();
+        }
+
+        JsonObject seatMap = seatMapResponse.asObject();
+        if (seatMap == null || !seatMap.has("seats") || !seatMap.get("seats").isJsonArray()) {
+            return Map.of();
+        }
+
+        JsonArray seats = seatMap.getAsJsonArray("seats");
+        Map<String, Integer> minIndexByClass = new LinkedHashMap<>();
+        Map<String, Integer> maxIndexByClass = new LinkedHashMap<>();
+        Map<String, String> minSeatByClass = new LinkedHashMap<>();
+        Map<String, String> maxSeatByClass = new LinkedHashMap<>();
+
+        for (JsonElement seatElement : seats) {
+            if (!seatElement.isJsonObject()) {
+                continue;
+            }
+
+            JsonObject seatObj = seatElement.getAsJsonObject();
+            String cabinClass = getSafe(seatObj, "cabin_class");
+            String seatNumber = getSafe(seatObj, "seat_number");
+            if ("-".equals(cabinClass) || "-".equals(seatNumber)) {
+                continue;
+            }
+
+            int seatIndex = seatOrderIndex(seatNumber);
+            if (seatIndex < 0) {
+                continue;
+            }
+
+            Integer currentMin = minIndexByClass.get(cabinClass);
+            if (currentMin == null || seatIndex < currentMin) {
+                minIndexByClass.put(cabinClass, seatIndex);
+                minSeatByClass.put(cabinClass, seatNumber);
+            }
+
+            Integer currentMax = maxIndexByClass.get(cabinClass);
+            if (currentMax == null || seatIndex > currentMax) {
+                maxIndexByClass.put(cabinClass, seatIndex);
+                maxSeatByClass.put(cabinClass, seatNumber);
+            }
+        }
+
+        Map<String, String> ranges = new LinkedHashMap<>();
+        for (String cabinClass : List.of("First", "Business", "Economy")) {
+            String minSeat = minSeatByClass.get(cabinClass);
+            String maxSeat = maxSeatByClass.get(cabinClass);
+            if (minSeat != null && maxSeat != null) {
+                ranges.put(cabinClass, minSeat + " to " + maxSeat);
+            }
+        }
+        return ranges;
+    }
+
+    private void printClassSeatRanges(Map<String, String> ranges) {
+        if (ranges == null || ranges.isEmpty()) {
+            return;
+        }
+
+        println("\nSeat range indicators for this flight:");
+        for (String cabinClass : List.of("First", "Business", "Economy")) {
+            String range = ranges.get(cabinClass);
+            if (range == null) {
+                println("- " + cabinClass + ": Not available");
+            } else {
+                println("- " + cabinClass + ": " + range);
+            }
+        }
+    }
+
+    private int seatOrderIndex(String seatNumber) {
+        if (seatNumber == null) {
+            return -1;
+        }
+
+        String normalized = seatNumber.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.matches("^[0-9]{1,3}[A-Z]$")) {
+            return -1;
+        }
+
+        try {
+            int row = Integer.parseInt(normalized.substring(0, normalized.length() - 1));
+            int letterOffset = normalized.charAt(normalized.length() - 1) - 'A';
+            if (row <= 0 || letterOffset < 0) {
+                return -1;
+            }
+            return row * 32 + letterOffset;
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     private void printApiError(String prefix, ApiResponse response) {
